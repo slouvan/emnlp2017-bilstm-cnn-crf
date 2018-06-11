@@ -7,7 +7,8 @@ License: Apache-2.0
 
 from __future__ import print_function
 from util import BIOF1Validation
-
+import numpy as np
+np.random.seed(1337)
 import keras
 from keras.optimizers import *
 from keras.models import Model
@@ -20,7 +21,7 @@ import time
 import os
 import random
 import logging
-
+from collections import defaultdict
 from .keraslayers.ChainCRF import ChainCRF
 
 
@@ -32,14 +33,14 @@ class BiLSTM:
         self.models = None
         self.modelSavePath = None
         self.resultsSavePath = None
-
+        self.predictionSavePath = None
 
         # Hyperparameters for the network
         defaultParams = {'dropout': (0.5,0.5), 'classifier': ['Softmax'], 'LSTM-Size': (100,), 'customClassifier': {},
                          'optimizer': 'adam',
                          'charEmbeddings': None, 'charEmbeddingsSize': 30, 'charFilterSize': 30, 'charFilterLength': 3, 'charLSTMSize': 25, 'maxCharLength': 25,
                          'useTaskIdentifier': False, 'clipvalue': 0, 'clipnorm': 1,
-                         'earlyStopping': 5, 'miniBatchSize': 32,
+                         'earlyStopping': 10, 'miniBatchSize': 32,
                          'featureNames': ['tokens', 'casing'], 'addFeatureDimensions': 10}
         if params != None:
             defaultParams.update(params)
@@ -51,24 +52,38 @@ class BiLSTM:
         self.embeddings = embeddings
         self.mappings = mappings
 
-    def setDataset(self, datasets, data):
+
+    def setDataset(self, datasets, data, mainModelName=None):
         self.datasets = datasets
         self.data = data
 
         # Create some helping variables
-        self.mainModelName = None
+        self.mainModelName = mainModelName
         self.epoch = 0
         self.learning_rate_updates = {'sgd': {1: 0.1, 3: 0.05, 5: 0.01}}
-        self.modelNames = list(self.datasets.keys())
+        self.modelNames = sorted(list(self.datasets.keys()))
         self.evaluateModelNames = []
         self.labelKeys = {}
         self.idx2Labels = {}
         self.trainMiniBatchRanges = None
         self.trainSentenceLengthRanges = None
 
+        # sort model names
+        # jadiin yang main pertama
+        if  self.mainModelName is not None:
+            print("Main model is : {}, Current list of model name is {}".format(self.mainModelName, self.modelNames))
+            if self.modelNames.index(self.mainModelName) != 0:
+                swap_idx = self.modelNames.index(self.mainModelName)
+                temp = self.modelNames[0]
+                self.modelNames[0] = self.modelNames[swap_idx]
+                self.modelNames[swap_idx] = temp
+
+                print("List of model names is changed : {}".format(self.modelNames))
 
         for modelName in self.modelNames:
             labelKey = self.datasets[modelName]['label']
+            print("Label here : {}".format(self.datasets[modelName]['label']))
+            print("Keys : {}".format(self.mappings[labelKey]))
             self.labelKeys[modelName] = labelKey
             self.idx2Labels[modelName] = {v: k for k, v in self.mappings[labelKey].items()}
             
@@ -80,7 +95,6 @@ class BiLSTM:
             logging.info("%d dev sentences" % len(self.data[modelName]['devMatrix']))
             logging.info("%d test sentences" % len(self.data[modelName]['testMatrix']))
             
-        
         if len(self.evaluateModelNames) == 1:
             self.mainModelName = self.evaluateModelNames[0]
              
@@ -258,13 +272,16 @@ class BiLSTM:
             for modelName in self.modelNames:            
                 K.set_value(self.models[modelName].optimizer.lr, self.learning_rate_updates[self.params['optimizer']][self.epoch]) 
                 
-            
+        total_sentence = defaultdict(int)
         for batch in self.minibatch_iterate_dataset():
             for modelName in self.modelNames:         
                 nnLabels = batch[modelName][0]
                 nnInput = batch[modelName][1:]
-                self.models[modelName].train_on_batch(nnInput, nnLabels)  
-                
+        #        print("{} {} {} {} {} {} {} {}".format(modelName, type(nnInput), len(nnInput[0]), nnInput[0],  len(nnInput[1]), nnInput[1] , len(nnInput[1]), nnInput[1] ))
+                total_sentence[modelName] += len(nnInput[0])
+                self.models[modelName].train_on_batch(nnInput, nnLabels)
+
+        print("Total training sentence : {}".format(total_sentence))
                                
             
           
@@ -324,10 +341,12 @@ class BiLSTM:
             for dataRange in self.trainSentenceLengthRanges[modelName]:
                 for i in reversed(range(dataRange[0]+1, dataRange[1])):
                     # pick an element in x[:i+1] with which to exchange x[i]
+                    random.seed(1337)
                     j = random.randint(dataRange[0], i)
                     x[i], x[j] = x[j], x[i]
                
-            #2. Shuffle the order of the mini batch ranges       
+            #2. Shuffle the order of the mini batch ranges
+            random.seed(1337)
             random.shuffle(self.trainMiniBatchRanges[modelName])
      
         
@@ -382,19 +401,24 @@ class BiLSTM:
             sys.stdout.flush()           
             logging.info("\n--------- Epoch %d -----------" % (epoch+1))
             
-            start_time = time.time() 
+            start_time = time.time()
+
+            # Training Part
             self.trainModel()
             time_diff = time.time() - start_time
             total_train_time += time_diff
             logging.info("%.2f sec for training (%.2f total)" % (time_diff, total_train_time))
             
-            
+
+            # Evaluation Part
             start_time = time.time() 
             for modelName in self.evaluateModelNames:
                 logging.info("-- %s --" % (modelName))
-                dev_score, test_score = self.computeScore(modelName, self.data[modelName]['devMatrix'], self.data[modelName]['testMatrix'])
+                dev_score, test_score = self.computeScore(modelName, self.data[modelName]['devMatrix'], self.data[modelName]['testMatrix'],epoch=epoch)
          
-                
+                # Jika target task di set maka check target task aja
+
+                # else ya yang default
                 if dev_score > max_dev_score[modelName]:
                     max_dev_score[modelName] = dev_score
                     max_test_score[modelName] = test_score
@@ -459,39 +483,50 @@ class BiLSTM:
         predLabels = [None]*len(sentences)
         sentenceLengths = self.getSentenceLengths(sentences)
         
-        for indices in sentenceLengths.values():   
-            nnInput = []                  
+        for indices in sentenceLengths.values():
+            #indices itu adalah idx sentence dengan panjang tertentu
+            nnInput = []
+            raw_text = []
             for featureName in self.params['featureNames']:
                 inputData = np.asarray([sentences[idx][featureName] for idx in indices])
                 nnInput.append(inputData)
-            
+            #print(indices)
+            raw_texts = [sentences[idx]['raw_tokens'] for idx in indices]
+            #print("Len NN Input : {}".format(len(nnInput)))
+            #print("NN input content : {}".format(nnInput))
+            #print("Len Raw Text : {}".format(len(raw_texts)))
+            #print(raw_texts)
+
             predictions = model.predict(nnInput, verbose=False)
             predictions = predictions.argmax(axis=-1) #Predict classes            
            
-            
+            #print("Idx 2 Labels {} {}".format(type(self.idx2Labels), self.idx2Labels))
             predIdx = 0
             for idx in indices:
-                predLabels[idx] = predictions[predIdx]    
-                predIdx += 1   
-        
+                predLabels[idx] = predictions[predIdx]
+
+                #print("Prediction type : {}".format(type(predLabels[idx])))
+                #print("Prediction : {}".format(predLabels[idx]))
+                predIdx += 1
+            #exit()
         return predLabels
     
    
-    def computeScore(self, modelName, devMatrix, testMatrix):
+    def computeScore(self, modelName, devMatrix, testMatrix, epoch=0):
         if self.labelKeys[modelName].endswith('_BIO') or self.labelKeys[modelName].endswith('_IOBES') or self.labelKeys[modelName].endswith('_IOB'):
-            return self.computeF1Scores(modelName, devMatrix, testMatrix)
+            return self.computeF1Scores(modelName, devMatrix, testMatrix, epoch = epoch)
         else:
             return self.computeAccScores(modelName, devMatrix, testMatrix)   
 
-    def computeF1Scores(self, modelName, devMatrix, testMatrix):
+    def computeF1Scores(self, modelName, devMatrix, testMatrix, epoch = 0):
         #train_pre, train_rec, train_f1 = self.computeF1(modelName, self.datasets[modelName]['trainMatrix'])
         #print "Train-Data: Prec: %.3f, Rec: %.3f, F1: %.4f" % (train_pre, train_rec, train_f1)
         
-        dev_pre, dev_rec, dev_f1 = self.computeF1(modelName, devMatrix)
-        logging.info("Dev-Data: Prec: %.3f, Rec: %.3f, F1: %.4f" % (dev_pre, dev_rec, dev_f1))
-        
-        test_pre, test_rec, test_f1 = self.computeF1(modelName, testMatrix)
-        logging.info("Test-Data: Prec: %.3f, Rec: %.3f, F1: %.4f" % (test_pre, test_rec, test_f1))
+        dev_pre, dev_rec, dev_f1 = self.computeF1(modelName, devMatrix, mode = 'dev', epoch = epoch)
+        logging.info("Dev-Data: Prec: %.3f, Rec: %.3f, F1: %.2f" % (dev_pre, dev_rec, dev_f1))
+
+        test_pre, test_rec, test_f1 = self.computeF1(modelName, testMatrix, mode = 'test', epoch = epoch)
+        logging.info("Test-Data: Prec: %.3f, Rec: %.3f, F1: %.2f" % (test_pre, test_rec, test_f1))
         
         return dev_f1, test_f1
     
@@ -505,7 +540,7 @@ class BiLSTM:
         return dev_acc, test_acc   
         
         
-    def computeF1(self, modelName, sentences):
+    def computeF1(self, modelName, sentences, mode="", epoch = 0):
         labelKey = self.labelKeys[modelName]
         model = self.models[modelName]
         idx2Label = self.idx2Labels[modelName]
@@ -513,15 +548,19 @@ class BiLSTM:
         correctLabels = [sentences[idx][labelKey] for idx in range(len(sentences))]
         predLabels = self.predictLabels(model, sentences) 
 
+        if self.predictionSavePath != None :
+            self.savePredictionResults(modelName, sentences, correctLabels, predLabels, idx2Label, epoch, mode)
+
         labelKey = self.labelKeys[modelName]
         encodingScheme = labelKey[labelKey.index('_')+1:]
         
-        pre, rec, f1 = BIOF1Validation.compute_f1(predLabels, correctLabels, idx2Label, 'O', encodingScheme)
-        pre_b, rec_b, f1_b = BIOF1Validation.compute_f1(predLabels, correctLabels, idx2Label, 'B', encodingScheme)
-        
-        if f1_b > f1:
-            logging.debug("Setting wrong tags to B- improves from %.4f to %.4f" % (f1, f1_b))
-            pre, rec, f1 = pre_b, rec_b, f1_b
+        #pre, rec, f1 = BIOF1Validation.compute_f1(predLabels, correctLabels, idx2Label, 'O', encodingScheme)
+        #pre_b, rec_b, f1_b = BIOF1Validation.compute_f1(predLabels, correctLabels, idx2Label, 'B', encodingScheme)
+        pre, rec, f1 = BIOF1Validation.compute_f1_conll(correctLabels, predLabels, idx2Label)
+        #logging.info("ConLL version p : {:.2f} r: {:.2f} f1: {:.2f}".format(pre_conll, rec_conll, f1_conll))
+        #if f1_b > f1:
+        #    logging.info("Setting wrong tags to B- improves from %.4f to %.4f" % (f1, f1_b))
+        #    pre, rec, f1 = pre_b, rec_b, f1_b
         
         return pre, rec, f1
     
@@ -597,6 +636,29 @@ class BiLSTM:
             h5file.attrs['modelName'] = modelName
             h5file.attrs['labelKey'] = self.datasets[modelName]['label']
 
+
+    def savePredictionResults(self, modelName, sentences, correctLabels,predLabels, idx2Label,epoch, mode = ""):
+        if self.predictionSavePath== None:
+            raise ValueError('predictionSavePath not specified.')
+        #savePath = self.modelSavePath.replace("[DevScore]", "%.4f" % dev_score).replace("[TestScore]", "%.4f" % test_score).replace( "[Epoch]", str(epoch + 1)).replace("[ModelName]", modelName)
+        #print(type(self.predictionSavePath))
+        savePath = self.predictionSavePath.replace("[Epoch]", str(epoch + 1))#.replace("[ModelName]", modelName).replace("[Data]", mode)
+        ##print(modelName)
+        print(mode)
+        savePath = savePath.replace("[ModelName]", modelName).replace("[Data]", mode)
+        #print(savePath)
+        with open(savePath, "w") as f:
+            for idx in range(len(sentences)):
+                #print("Sentence :       {}".format(sentences[idx]['raw_tokens']))
+                #print("Predicted tags : {}{}".format(type(predLabels[idx]), predLabels[idx]))
+                correctLabel = [idx2Label[labelId] for labelId in correctLabels[idx]]
+                #print("Correct label : {}".format(correctLabel))
+                predictedLabel = [idx2Label[labelId] for labelId in predLabels[idx]]
+
+                #print("Label  : {}".format(predictedLabel))
+                for token_id in range(len(sentences[idx]['raw_tokens'])):
+                    f.write(sentences[idx]['raw_tokens'][token_id]+" "+correctLabel[token_id]+" "+predictedLabel[token_id]+"\n")
+                f.write("\n")
 
 
 

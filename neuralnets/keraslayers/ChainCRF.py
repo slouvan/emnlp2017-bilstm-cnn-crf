@@ -5,7 +5,8 @@ Author: Philipp Gross @ https://github.com/phipleg/keras/blob/crf/keras/layers/c
 '''
 
 from __future__ import absolute_import
-
+import numpy as np
+np.random.seed(1337)
 import keras
 from keras import backend as K
 from keras import regularizers

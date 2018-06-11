@@ -9,10 +9,13 @@ import os
 import logging
 import sys
 from neuralnets.BiLSTM import BiLSTM
-from util.preprocessing import perpareDataset, loadDatasetPickle
-
+import argparse
+from util.preprocessing import perpareDataset, loadDatasetPickle, readCoNLL, remove_pkl_files,prepare_training_data
 from keras import backend as K
 
+parser = argparse.ArgumentParser(description="Experiment Slot Filling")
+parser.add_argument("-l", "--labeling-rate", dest="labeling_rate", help="Labeling Rate", metavar="N", type=float)
+args = parser.parse_args()
 
 # :: Change into the working dir of the script ::
 abspath = os.path.abspath(__file__)
@@ -36,23 +39,57 @@ logger.addHandler(ch)
 # Data preprocessing
 #
 ######################################################
+#datasets = {
+#    'unidep_pos':
+#        {'columns': {1:'tokens', 3:'POS'},
+#         'label': 'POS',
+#         'evaluate': True,
+#         'commentSymbol': None},
+#    'conll2000_chunking':
+#        {'columns': {0:'tokens', 2:'chunk_BIO'},
+#         'label': 'chunk_BIO',
+#         'evaluate': True,
+#         'commentSymbol': None},
+#}
+
+######################################################
+#
+# Data preprocessing
+#
+######################################################
 datasets = {
-    'unidep_pos':
-        {'columns': {1:'tokens', 3:'POS'},
-         'label': 'POS',
-         'evaluate': True,
-         'commentSymbol': None},
-    'conll2000_chunking':
-        {'columns': {0:'tokens', 2:'chunk_BIO'},
-         'label': 'chunk_BIO',
-         'evaluate': True,
-         'commentSymbol': None},
+    'ATIS':                            #Name of the dataset
+        {'columns': {0:'tokens', 1:'atis_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
+         'label': 'atis_BIO',                     #Which column we like to predict
+         'evaluate': True,                   #Should we evaluate on this task? Set true always for single task setups
+         'commentSymbol': None,
+         'targetTask' : True,
+         'proportion': 0.6,
+         'ori': True},
+    'CONLL_2003_NER':                            #Name of the dataset
+        {'columns': {0:'tokens', 1:'CONLL_2003_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
+         'label': 'CONLL_2003_BIO',                     #Which column we like to predict
+         'evaluate': True,                   #Should we evaluate on this task? Set true always for single task setups
+         'commentSymbol': None,
+         'targetTask' : False,
+         'proportion' : 1,
+         'ori': True,},              #Lines in the input data starting with this string will be skipped. Can be used to skip comments
 }
+
+if args.labeling_rate is not None :
+    datasets['ATIS']['proportion'] = args.labeling_rate
+else :
+    datasets['ATIS']['proportion'] = 1
+print("Labeling rate is set to : {} ".format(datasets['ATIS']['proportion']))
+
+
+#remove_pkl_files()
+prepare_training_data(datasets)
 
 embeddingsPath = 'komninos_english_embeddings.gz' #Word embeddings by Levy et al: https://levyomer.wordpress.com/2014/04/25/dependency-based-word-embeddings/
 
 # :: Prepares the dataset to be used with the LSTM-network. Creates and stores cPickle files in the pkl/ folder ::
-pickleFile = perpareDataset(embeddingsPath, datasets)
+pickleFile = perpareDataset(embeddingsPath, datasets, reducePretrainedEmbeddings=True)
 
 
 ######################################################
@@ -66,14 +103,17 @@ pickleFile = perpareDataset(embeddingsPath, datasets)
 embeddings, mappings, data = loadDatasetPickle(pickleFile)
 
 # Some network hyperparameters
-params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.25, 0.25)}
+params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.5, 0.5), 'charEmbeddings': 'CNN'}
 
 
 model = BiLSTM(params)
 model.setMappings(mappings, embeddings)
-model.setDataset(datasets, data)
-model.modelSavePath = "models/[ModelName]_[DevScore]_[TestScore]_[Epoch].h5"
-model.fit(epochs=25)
+model.setDataset(datasets, data, mainModelName='ATIS')  # KHUSUS MULTITSAK
+
+model.storeResults('results/ATIS_CONLL_Multitask_'+str(datasets['ATIS']['proportion'])+'.csv') #Path to store performance scores for dev / test
+model.predictionSavePath = "results/[ModelName]_MultiTask_"+str(datasets['ATIS']['proportion'])+"_[Epoch]_[Data].conll" #Path to store predictions
+model.modelSavePath = "models/[ModelName]_Multitask_"+str(datasets['ATIS']['proportion'])+"_[[DevScore]_[TestScore]_[Epoch].h5" # labeling_rate
+model.fit(epochs=50)
 
 
 

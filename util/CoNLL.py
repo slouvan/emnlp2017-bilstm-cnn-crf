@@ -1,6 +1,21 @@
 from __future__ import print_function
 import os
 
+
+def dumpConll(outputPath, sentences, headers):
+    """
+    Writes a sentences array/hashmap to a CoNLL format
+    """
+    if not os.path.exists(os.path.dirname(outputPath)):
+        os.makedirs(os.path.dirname(outputPath))
+    fOut = open(outputPath, 'w')
+
+    for sentence in sentences:
+        for idx in range(len(sentence['tokens'])):
+            fOut.write(sentence[headers[0]][idx]+"\t"+sentence[headers[1]][idx]+"\n")
+
+        fOut.write("\n")
+
 def conllWrite(outputPath, sentences, headers):
     """
     Writes a sentences array/hashmap to a CoNLL format
@@ -21,7 +36,7 @@ def conllWrite(outputPath, sentences, headers):
         fOut.write("\n")
         
         
-def readCoNLL(inputPath, cols, commentSymbol=None, valTransformation=None):
+def readCoNLL(inputPath, cols, commentSymbol=None, valTransformation=None, portion=1):
     """
     Reads in a CoNLL file
     """
@@ -44,6 +59,9 @@ def readCoNLL(inputPath, cols, commentSymbol=None, valTransformation=None):
             continue
         
         splits = line.split()
+        #print(cols)
+        #print(line)
+        #print(splits)
         for colIdx, colName in cols.items():
             val = splits[colIdx]
             
@@ -57,7 +75,8 @@ def readCoNLL(inputPath, cols, commentSymbol=None, valTransformation=None):
         
     if newData:        
         sentences.append(sentence)
-            
+
+
     for name in cols.values():
         if name.endswith('_BIO'):
             iobesName = name[0:-4]+'_class'  

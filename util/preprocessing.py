@@ -6,9 +6,10 @@ import os.path
 import nltk
 import logging
 from nltk import FreqDist
-
+from .CoNLL import dumpConll
 from .WordEmbeddings import wordNormalize
 from .CoNLL import readCoNLL
+from shutil import copyfile
 
 import sys
 if (sys.version_info > (3, 0)):
@@ -17,7 +18,35 @@ else: #Python 2.7 imports
     import cPickle as pkl
     from io import open
 
-def perpareDataset(embeddingsPath, datasets, frequencyThresholdUnknownTokens=50, reducePretrainedEmbeddings=False, valTransformations=None, padOneTokenSentence=True):
+
+def remove_pkl_files():
+    import os
+    import glob
+
+    files = glob.glob('pkl/*')
+    for f in files:
+        print("REMOVING pk file")
+        os.remove(f)
+
+def prepare_training_data(datasets) :
+    data_folder = 'data'
+    # if proportion is < 1.0 then sample from the original training data then output it to train.txt
+    for dataset_name, props in datasets.items():
+
+            from numpy.random import shuffle
+            if props['ori'] and os.path.isfile(os.path.join(data_folder,dataset_name,'train.txt.ori')) and props['proportion'] == 1:
+                # sentences = readCoNLL('data/CONLL_2003_NER/train.txt.ori', props['columns'])
+                copyfile(os.path.join(data_folder, dataset_name, 'train.txt.ori'), os.path.join(data_folder, dataset_name, 'train.txt'))
+            else:
+                sentences = readCoNLL(os.path.join(data_folder, dataset_name, 'train.txt.ori'), props['columns'])
+                np.random.seed(13)
+                shuffled_indices = np.random.choice(len(sentences), int(props['proportion'] * len(sentences)))
+                sentences = np.asarray(sentences)[shuffled_indices].tolist()
+                dumpConll(os.path.join(data_folder, dataset_name, 'train.txt'), sentences, props['columns'])
+                #dumpConll(os.path.join(data_folder, dataset_name, 'train.txt.'+str(props['columns'])), sentences, props['columns'])
+
+
+def perpareDataset(embeddingsPath, datasets, frequencyThresholdUnknownTokens=50, labeling_rate = 1.0,reducePretrainedEmbeddings=False, valTransformations=None, padOneTokenSentence=True):
     """
     Reads in the pre-trained embeddings (in text format) from embeddingsPath and prepares those to be used with the LSTM network.
     Unknown words in the trainDataPath-file are added, if they appear at least frequencyThresholdUnknownTokens times
@@ -32,11 +61,11 @@ def perpareDataset(embeddingsPath, datasets, frequencyThresholdUnknownTokens=50,
     """
     embeddingsName = os.path.splitext(embeddingsPath)[0]
     pklName = "_".join(sorted(datasets.keys()) + [embeddingsName])
-    outputPath = 'pkl/' + pklName + '.pkl'
+    outputPath = 'pkl/' + pklName + '_'+str(labeling_rate)+'.pkl'
 
-    if os.path.isfile(outputPath):
-        logging.info("Using existent pickle file: %s" % outputPath)
-        return outputPath
+    #if os.path.isfile(outputPath):
+    #    logging.info("Using existent pickle file: %s" % outputPath)
+    #    return outputPath
 
     casing2Idx = getCasingVocab()
     embeddings, word2Idx = readEmbeddings(embeddingsPath, datasets, frequencyThresholdUnknownTokens, reducePretrainedEmbeddings)
@@ -114,10 +143,14 @@ def readEmbeddings(embeddingsPath, datasetFiles, frequencyThresholdUnknownTokens
                     vocab[wordLower] = True
                     vocab[wordNormalized] = True
 
-        for dataset in datasetFiles:
-            dataColumnsIdx = {y: x for x, y in dataset['cols'].items()}
+        for key, dataset in datasetFiles.items():
+            print(dataset)
+
+            dataColumnsIdx = {y: x for x, y in dataset['columns'].items()}
+
             tokenIdx = dataColumnsIdx['tokens']
-            datasetPath = 'data/%s/' % dataset['name']
+            #datasetPath = 'data/%s/' % dataset['name']
+            datasetPath = 'data/%s/' % key
 
             for dataset in ['train.txt', 'dev.txt', 'test.txt']:
                 createDict(datasetPath + dataset, tokenIdx, neededVocab)
@@ -150,6 +183,7 @@ def readEmbeddings(embeddingsPath, datasetFiles, frequencyThresholdUnknownTokens
             embeddings.append(vector)
 
             word2Idx["UNKNOWN_TOKEN"] = len(word2Idx)
+            np.random.seed(13)
             vector = np.random.uniform(-0.25, 0.25, embeddingsDimension)  # Alternativ -sqrt(3/dim) ... sqrt(3/dim)
             embeddings.append(vector)
 
@@ -191,6 +225,7 @@ def readEmbeddings(embeddingsPath, datasetFiles, frequencyThresholdUnknownTokens
 
             addedWords += 1
             word2Idx[word] = len(word2Idx)
+            np.random.seed(13)
             vector = np.random.uniform(-0.25, 0.25, len(split) - 1)  # Alternativ -sqrt(3/dim) ... sqrt(3/dim)
             embeddings.append(vector)
 
@@ -306,7 +341,7 @@ def createMatrices(sentences, mappings, padOneTokenSentence):
                     row[mapping].append(0)
             
         data.append(row)
-    
+
     if numTokens > 0:           
         logging.info("Unknown-Tokens: %.2f%%" % (numUnknownTokens/float(numTokens)*100))
         
@@ -341,8 +376,8 @@ def createPklFiles(datasetFiles, mappings, cols, commentSymbol, valTransformatio
     trainMatrix = createMatrices(trainSentences, mappings, padOneTokenSentence)
 
     logging.info(":: Create Dev Matrix ::")
-    devMatrix = createMatrices(devSentences, mappings, padOneTokenSentence)
 
+    devMatrix = createMatrices(devSentences, mappings, padOneTokenSentence)
     logging.info(":: Create Test Matrix ::")
     testMatrix = createMatrices(testSentences, mappings, padOneTokenSentence)
 
