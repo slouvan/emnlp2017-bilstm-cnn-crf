@@ -34,7 +34,8 @@ class BiLSTM:
         self.modelSavePath = None
         self.resultsSavePath = None
         self.predictionSavePath = None
-
+        self.earlyStoppingTargetTask = None
+        self.customizedAlternate = None
         # Hyperparameters for the network
         defaultParams = {'dropout': (0.5,0.5), 'classifier': ['Softmax'], 'LSTM-Size': (100,), 'customClassifier': {},
                          'optimizer': 'adam',
@@ -271,15 +272,32 @@ class BiLSTM:
             logging.info("Update Learning Rate to %f" % (self.learning_rate_updates[self.params['optimizer']][self.epoch]))
             for modelName in self.modelNames:            
                 K.set_value(self.models[modelName].optimizer.lr, self.learning_rate_updates[self.params['optimizer']][self.epoch]) 
-                
+
+        '''
+        if self.customizedAlternate :
+            total_sentence = defaultdict(int)
+            for batch in self.minibatch_iterate_dataset():
+                for modelName in self.modelNames:
+                    nnLabels = batch[modelName][0]
+                    nnInput = batch[modelName][1:]
+                    #        print("{} {} {} {} {} {} {} {}".format(modelName, type(nnInput), len(nnInput[0]), nnInput[0],  len(nnInput[1]), nnInput[1] , len(nnInput[1]), nnInput[1] ))
+                    total_sentence[modelName] += len(nnInput[0])
+                    print ("Model name : {} Nb Sentence : {}".format(modelName, len(nnInput[0])))
+                    #self.models[modelName].train_on_batch(nnInput, nnLabels)
+
+            print("Total training sentence : {}".format(total_sentence))
+            #exit()
+        else :
+        '''
         total_sentence = defaultdict(int)
         for batch in self.minibatch_iterate_dataset():
-            for modelName in self.modelNames:         
+            for idx, modelName in enumerate(self.modelNames):
                 nnLabels = batch[modelName][0]
                 nnInput = batch[modelName][1:]
         #        print("{} {} {} {} {} {} {} {}".format(modelName, type(nnInput), len(nnInput[0]), nnInput[0],  len(nnInput[1]), nnInput[1] , len(nnInput[1]), nnInput[1] ))
                 total_sentence[modelName] += len(nnInput[0])
                 self.models[modelName].train_on_batch(nnInput, nnLabels)
+
 
         print("Total training sentence : {}".format(total_sentence))
                                
@@ -415,9 +433,31 @@ class BiLSTM:
             for modelName in self.evaluateModelNames:
                 logging.info("-- %s --" % (modelName))
                 dev_score, test_score = self.computeScore(modelName, self.data[modelName]['devMatrix'], self.data[modelName]['testMatrix'],epoch=epoch)
-         
-                # Jika target task di set maka check target task aja
 
+                # Jika target task di set maka check target task aja
+                '''
+                if self.earlyStoppingTargetTask is not None and self.mainModelName is not None:
+                    print("Updating early stopping on the target task")
+                    if modelName == self.mainModelName :
+                        if dev_score > max_dev_score[modelName] :
+                            max_dev_score[modelName] = dev_score
+                            max_test_score[modelName] = test_score
+                            no_improvement_since = 0
+
+                            if self.modelSavePath != None:
+                                self.saveModel(modelName, epoch, dev_score, test_score)
+
+                        else :
+                            no_improvement_since += 1
+                    else :
+                        if dev_score > max_dev_score[modelName]:
+                            max_dev_score[modelName] = dev_score
+                            max_test_score[modelName] = test_score
+
+                            if self.modelSavePath != None:
+                                self.saveModel(modelName, epoch, dev_score, test_score)
+                else :
+                '''
                 # else ya yang default
                 if dev_score > max_dev_score[modelName]:
                     max_dev_score[modelName] = dev_score

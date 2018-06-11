@@ -58,14 +58,14 @@ logger.addHandler(ch)
 #
 ######################################################
 datasets = {
-    'ATIS':                            #Name of the dataset
-        {'columns': {0:'tokens', 1:'atis_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
-         'label': 'atis_BIO',                     #Which column we like to predict
+    'MIT_Movie':                     #Name of the dataset
+        {'columns': {0:'tokens', 1:'movie_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
+         'label': 'movie_BIO',                     #Which column we like to predict
          'evaluate': True,                   #Should we evaluate on this task? Set true always for single task setups
          'commentSymbol': None,
-         'targetTask' : True,
          'proportion': 0.6,
-         'ori': True},
+         'ori': True,
+         'targetTask': True},
     'CONLL_2003_NER':                            #Name of the dataset
         {'columns': {0:'tokens', 1:'CONLL_2003_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
          'label': 'CONLL_2003_BIO',                     #Which column we like to predict
@@ -76,11 +76,14 @@ datasets = {
          'ori': True,},              #Lines in the input data starting with this string will be skipped. Can be used to skip comments
 }
 
+
+labeling_rate = 0.0
 if args.labeling_rate is not None :
-    datasets['ATIS']['proportion'] = args.labeling_rate
+    datasets['MIT_Movie']['proportion'] = args.labeling_rate
 else :
-    datasets['ATIS']['proportion'] = 1
-print("Labeling rate is set to : {} ".format(datasets['ATIS']['proportion']))
+    datasets['MIT_Movie']['proportion'] = 1
+
+print("Labeling rate is set to : {} ".format(datasets['MIT_Movie']['proportion']))
 
 
 #remove_pkl_files()
@@ -108,11 +111,11 @@ params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.5, 0.5), 'cha
 
 model = BiLSTM(params)
 model.setMappings(mappings, embeddings)
-model.setDataset(datasets, data, mainModelName='ATIS')  # KHUSUS MULTITSAK
+model.setDataset(datasets, data, mainModelName='MIT_Movie')  # KHUSUS MULTITSAK
 
-model.storeResults('results/ATIS_CONLL_Multitask_'+str(datasets['ATIS']['proportion'])+'.csv') #Path to store performance scores for dev / test
-model.predictionSavePath = "results/[ModelName]_MultiTask_"+str(datasets['ATIS']['proportion'])+"_[Epoch]_[Data].conll" #Path to store predictions
-model.modelSavePath = "models/[ModelName]_Multitask_"+str(datasets['ATIS']['proportion'])+"_[[DevScore]_[TestScore]_[Epoch].h5" # labeling_rate
+model.storeResults('results/MIT_Movie_CONLL_Multitask_'+str(datasets['MIT_Movie']['proportion'])+'.csv') #Path to store performance scores for dev / test
+model.predictionSavePath = "results/[ModelName]_MultiTask_"+str(datasets['MIT_Movie']['proportion'])+"_[Epoch]_[Data].conll" #Path to store predictions
+model.modelSavePath = "models/[ModelName]_Multitask_"+str(datasets['MIT_Movie']['proportion'])+"_[[DevScore]_[TestScore]_[Epoch].h5" # labeling_rate
 model.customizedAlternate = True      # Additional params
 model.fit(epochs=50)
 
