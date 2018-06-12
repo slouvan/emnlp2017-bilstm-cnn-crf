@@ -103,7 +103,7 @@ pickleFile = perpareDataset(embeddingsPath, datasets, reducePretrainedEmbeddings
 embeddings, mappings, data = loadDatasetPickle(pickleFile)
 
 # Some network hyperparameters
-params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.5, 0.5), 'charEmbeddings': 'CNN'}
+params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.25, 0.25), 'charEmbeddings': 'CNN'}
 
 
 model = BiLSTM(params)

@@ -434,31 +434,6 @@ class BiLSTM:
                 logging.info("-- %s --" % (modelName))
                 dev_score, test_score = self.computeScore(modelName, self.data[modelName]['devMatrix'], self.data[modelName]['testMatrix'],epoch=epoch)
 
-                # Jika target task di set maka check target task aja
-                '''
-                if self.earlyStoppingTargetTask is not None and self.mainModelName is not None:
-                    print("Updating early stopping on the target task")
-                    if modelName == self.mainModelName :
-                        if dev_score > max_dev_score[modelName] :
-                            max_dev_score[modelName] = dev_score
-                            max_test_score[modelName] = test_score
-                            no_improvement_since = 0
-
-                            if self.modelSavePath != None:
-                                self.saveModel(modelName, epoch, dev_score, test_score)
-
-                        else :
-                            no_improvement_since += 1
-                    else :
-                        if dev_score > max_dev_score[modelName]:
-                            max_dev_score[modelName] = dev_score
-                            max_test_score[modelName] = test_score
-
-                            if self.modelSavePath != None:
-                                self.saveModel(modelName, epoch, dev_score, test_score)
-                else :
-                '''
-                # else ya yang default
                 if dev_score > max_dev_score[modelName]:
                     max_dev_score[modelName] = dev_score
                     max_test_score[modelName] = test_score
