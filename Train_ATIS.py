@@ -57,7 +57,6 @@ else :
     datasets['ATIS']['proportion'] = 1
 
 print("Labeling rate is set to : {} ".format(datasets['ATIS']['proportion']))
-#remove_pkl_files()
 prepare_training_data(datasets)
 
 # :: Path on your computer to the word embeddings. Embeddings by Komninos et al. will be downloaded automatically ::
