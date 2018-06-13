@@ -32,18 +32,19 @@ def prepare_training_data(datasets) :
     data_folder = 'data'
     # if proportion is < 1.0 then sample from the original training data then output it to train.txt
     for dataset_name, props in datasets.items():
-
+            sentences = None
             from numpy.random import shuffle
-            if props['ori'] and os.path.isfile(os.path.join(data_folder,dataset_name,'train.txt.ori')) and props['proportion'] == 1:
-                # sentences = readCoNLL('data/CONLL_2003_NER/train.txt.ori', props['columns'])
+            if props['ori'] and os.path.isfile(os.path.join(data_folder,dataset_name,'train.txt.ori')) and props['nb_sentence'] is None:
+                sentences = readCoNLL(os.path.join(data_folder, dataset_name, 'train.txt.ori'), props['columns'])
                 copyfile(os.path.join(data_folder, dataset_name, 'train.txt.ori'), os.path.join(data_folder, dataset_name, 'train.txt'))
             else:
                 sentences = readCoNLL(os.path.join(data_folder, dataset_name, 'train.txt.ori'), props['columns'])
                 np.random.seed(13)
-                shuffled_indices = np.random.choice(len(sentences), int(props['proportion'] * len(sentences)))
+                shuffled_indices = np.random.choice(len(sentences), props['nb_sentence'])
                 sentences = np.asarray(sentences)[shuffled_indices].tolist()
                 dumpConll(os.path.join(data_folder, dataset_name, 'train.txt'), sentences, props['columns'])
-                #dumpConll(os.path.join(data_folder, dataset_name, 'train.txt.'+str(props['columns'])), sentences, props['columns'])
+
+            print("Total number of {}  is {}".format(dataset_name, len(sentences)))
 
 
 def perpareDataset(embeddingsPath, datasets, frequencyThresholdUnknownTokens=50, labeling_rate = 1.0,reducePretrainedEmbeddings=False, valTransformations=None, padOneTokenSentence=True):

@@ -658,8 +658,7 @@ class BiLSTM:
         #savePath = self.modelSavePath.replace("[DevScore]", "%.4f" % dev_score).replace("[TestScore]", "%.4f" % test_score).replace( "[Epoch]", str(epoch + 1)).replace("[ModelName]", modelName)
         #print(type(self.predictionSavePath))
         savePath = self.predictionSavePath.replace("[Epoch]", str(epoch + 1))#.replace("[ModelName]", modelName).replace("[Data]", mode)
-        ##print(modelName)
-        print(mode)
+
         savePath = savePath.replace("[ModelName]", modelName).replace("[Data]", mode)
         #print(savePath)
         with open(savePath, "w") as f:

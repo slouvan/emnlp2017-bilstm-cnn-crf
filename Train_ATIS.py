@@ -12,7 +12,9 @@ from util.preprocessing import perpareDataset, loadDatasetPickle, readCoNLL, rem
 
 parser = argparse.ArgumentParser(description="Experiment Slot Filling")
 
-parser.add_argument("-l", "--labeling-rate", dest="labeling_rate", help="Labeling Rate", metavar="N", type=float)
+parser.add_argument("-n", "--nb-sentence", dest="nb_sentence", help="Number of training sentence", type=int)
+parser.add_argument("-d", "--directory-name", dest="directory_name", help="Directory Name", required = True, type=str)
+
 
 args = parser.parse_args()
 
@@ -44,26 +46,22 @@ datasets = {
          'label': 'atis_BIO',                     #Which column we like to predict
          'evaluate': True,                   #Should we evaluate on this task? Set true always for single task setups
          'commentSymbol': None,
-         'proportion': 0.6,
+         'nb_sentence': None,
          'ori': True,
          'targetTask': True}
           #Lines in the input data starting with this string will be skipped. Can be used to skip comments
 }
 
-labeling_rate = 0.0
-if args.labeling_rate is not None :
-    datasets['ATIS']['proportion'] = args.labeling_rate
-else :
-    datasets['ATIS']['proportion'] = 1
+if args.nb_sentence is not None :
+    datasets['ATIS']['nb_sentence'] = args.nb_sentence
 
-print("Labeling rate is set to : {} ".format(datasets['ATIS']['proportion']))
 prepare_training_data(datasets)
 
 # :: Path on your computer to the word embeddings. Embeddings by Komninos et al. will be downloaded automatically ::
 embeddingsPath = 'komninos_english_embeddings.gz'
 
 # :: Prepares the dataset to be used with the LSTM-network. Creates and stores cPickle files in the pkl/ folder ::
-pickleFile = perpareDataset(embeddingsPath, datasets,reducePretrainedEmbeddings=True)
+pickleFile = perpareDataset(embeddingsPath, datasets, reducePretrainedEmbeddings=True)
 
 
 ######################################################
@@ -82,10 +80,11 @@ params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.25, 0.25), 'c
 model = BiLSTM(params)
 model.setMappings(mappings, embeddings)
 model.setDataset(datasets, data)
-model.storeResults('results/atis_SingleTask_'+str(datasets['ATIS']['proportion'])+'_slot_results.csv') #Path to store performance scores for dev / test
-model.predictionSavePath = "results/[ModelName]_SingleTask_"+str(datasets['ATIS']['proportion'])+"_[Epoch]_[Data].conll" #Path to store predictions
-model.modelSavePath = "models/[ModelName]_SingleTask_"+str(datasets['ATIS']['proportion'])+"_[DevScore]_[TestScore]_[Epoch].h5" #Path to store models
+model.storeResults("/".join(["results",args.directory_name,"performance.out"])) #Path to store performance scores for dev / test
+model.predictionSavePath = "/".join(["results", args.directory_name,"predictions","[ModelName]_[Epoch]_[Data].conll"]) #Path to store predictions
+model.modelSavePath = "/".join(["results",args.directory_name,"models/model_[DevScore]_[TestScore]_[Epoch].h5"]) #Path to store models
 model.fit(epochs=50)
 
 
 
+# ATIS, Single Task , Labeling Rate

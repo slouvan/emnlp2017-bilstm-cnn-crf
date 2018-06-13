@@ -26,3 +26,11 @@ data/morphtag-latin
 results/
 
 data/
+
+predictions, ATIS_1_dev\.conll
+
+predictions, ATIS_1_test\.conll
+
+predictions, ATIS_2_dev\.conll
+
+predictions, ATIS_2_test\.conll
