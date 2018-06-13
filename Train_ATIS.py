@@ -84,7 +84,3 @@ model.storeResults("/".join(["results",args.directory_name,"performance.out"])) 
 model.predictionSavePath = "/".join(["results", args.directory_name,"predictions","[ModelName]_[Epoch]_[Data].conll"]) #Path to store predictions
 model.modelSavePath = "/".join(["results",args.directory_name,"models/model_[DevScore]_[TestScore]_[Epoch].h5"]) #Path to store models
 model.fit(epochs=50)
-
-
-
-# ATIS, Single Task , Labeling Rate

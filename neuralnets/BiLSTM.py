@@ -661,6 +661,13 @@ class BiLSTM:
 
         savePath = savePath.replace("[ModelName]", modelName).replace("[Data]", mode)
         #print(savePath)
+        directory = os.path.dirname(savePath)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        if os.path.isfile(savePath):
+            logging.info("Prediction " + savePath + " already exists. Prediction will be overwritten")
+
         with open(savePath, "w") as f:
             for idx in range(len(sentences)):
                 #print("Sentence :       {}".format(sentences[idx]['raw_tokens']))

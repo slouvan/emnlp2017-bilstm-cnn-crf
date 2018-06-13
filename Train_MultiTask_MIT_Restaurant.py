@@ -64,6 +64,7 @@ datasets = {
          'evaluate': True,                   #Should we evaluate on this task? Set true always for single task setups
          'commentSymbol': None,
          'proportion': 0.6,
+         'nb_sentence' : None,
          'ori': True,
          'targetTask': True},
     'CONLL_2003_NER':                            #Name of the dataset
@@ -73,17 +74,14 @@ datasets = {
          'commentSymbol': None,
          'targetTask' : False,
          'proportion' : 1,
+         'nb_sentence': None,
          'ori': True,},              #Lines in the input data starting with this string will be skipped. Can be used to skip comments
 }
 
 
-labeling_rate = 0.0
-if args.labeling_rate is not None :
-    datasets['MIT_Restaurant']['proportion'] = args.labeling_rate
-else :
-    datasets['MIT_Restaurant']['proportion'] = 1
+if args.nb_sentence is not None :
+    datasets['MIT_Restaurant']['nb_sentence'] = args.nb_sentence
 
-print("Labeling rate is set to : {} ".format(datasets['MIT_Restaurant']['proportion']))
 
 
 #remove_pkl_files()
@@ -113,9 +111,9 @@ model = BiLSTM(params)
 model.setMappings(mappings, embeddings)
 model.setDataset(datasets, data, mainModelName='MIT_Restaurant')  # KHUSUS MULTITSAK
 
-model.storeResults('results/MIT_Restaurant_CONLL_Multitask_'+str(datasets['MIT_Restaurant']['proportion'])+'.csv') #Path to store performance scores for dev / test
-model.predictionSavePath = "results/[ModelName]_MultiTask_"+str(datasets['MIT_Restaurant']['proportion'])+"_[Epoch]_[Data].conll" #Path to store predictions
-model.modelSavePath = "models/[ModelName]_Multitask_"+str(datasets['MIT_Restaurant']['proportion'])+"_[[DevScore]_[TestScore]_[Epoch].h5" # labeling_rate
+model.storeResults("/".join(["results",args.directory_name,"performance.out"])) #Path to store performance scores for dev / test
+model.predictionSavePath = "/".join(["results", args.directory_name,"predictions","[ModelName]_[Epoch]_[Data].conll"]) #Path to store predictions
+model.modelSavePath = "/".join(["results",args.directory_name,"models/model_[DevScore]_[TestScore]_[Epoch].h5"]) #Path to store models
 model.customizedAlternate = True      # Additional params
 model.fit(epochs=50)
 

@@ -14,7 +14,8 @@ from util.preprocessing import perpareDataset, loadDatasetPickle, readCoNLL, rem
 from keras import backend as K
 
 parser = argparse.ArgumentParser(description="Experiment Slot Filling")
-parser.add_argument("-l", "--labeling-rate", dest="labeling_rate", help="Labeling Rate", metavar="N", type=float)
+parser.add_argument("-n", "--nb-sentence", dest="nb_sentence", help="Number of training sentence", type=int)
+parser.add_argument("-d", "--directory-name", dest="directory_name", help="Directory Name", required = True, type=str)
 args = parser.parse_args()
 
 # :: Change into the working dir of the script ::
@@ -65,6 +66,7 @@ datasets = {
          'commentSymbol': None,
          'targetTask' : True,
          'proportion': 0.6,
+         'nb_sentence' : None,
          'ori': True},
     'CONLL_2003_NER':                            #Name of the dataset
         {'columns': {0:'tokens', 1:'CONLL_2003_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
@@ -73,14 +75,12 @@ datasets = {
          'commentSymbol': None,
          'targetTask' : False,
          'proportion' : 1,
+         'nb_sentence' : None,
          'ori': True,},              #Lines in the input data starting with this string will be skipped. Can be used to skip comments
 }
 
-if args.labeling_rate is not None :
-    datasets['ATIS']['proportion'] = args.labeling_rate
-else :
-    datasets['ATIS']['proportion'] = 1
-print("Labeling rate is set to : {} ".format(datasets['ATIS']['proportion']))
+if args.nb_sentence is not None :
+    datasets['ATIS']['nb_sentence'] = args.nb_sentence
 
 
 #remove_pkl_files()
@@ -110,11 +110,19 @@ model = BiLSTM(params)
 model.setMappings(mappings, embeddings)
 model.setDataset(datasets, data, mainModelName='ATIS')  # KHUSUS MULTITSAK
 
+model.storeResults("/".join(["results",args.directory_name,"performance.out"])) #Path to store performance scores for dev / test
+model.predictionSavePath = "/".join(["results", args.directory_name,"predictions","[ModelName]_[Epoch]_[Data].conll"]) #Path to store predictions
+model.modelSavePath = "/".join(["results",args.directory_name,"models/model_[DevScore]_[TestScore]_[Epoch].h5"]) #Path to store models
+
+model.fit(epochs=50)
+
+'''
 model.storeResults('results/ATIS_CONLL_Multitask_'+str(datasets['ATIS']['proportion'])+'.csv') #Path to store performance scores for dev / test
 model.predictionSavePath = "results/[ModelName]_MultiTask_"+str(datasets['ATIS']['proportion'])+"_[Epoch]_[Data].conll" #Path to store predictions
 model.modelSavePath = "models/[ModelName]_Multitask_"+str(datasets['ATIS']['proportion'])+"_[[DevScore]_[TestScore]_[Epoch].h5" # labeling_rate
 model.customizedAlternate = True      # Additional params
-model.fit(epochs=50)
+'''
+
 
 
 

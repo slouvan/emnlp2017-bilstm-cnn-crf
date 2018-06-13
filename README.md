@@ -23,7 +23,7 @@ The training of the network is simple and the neural network can easily be train
 
 Trained models can be **stored** and **loaded** for inference. Simply execute `python RunModel.py models/modelname.h5 input.txt`. Pretrained-models for some sequence tagging task using this LSTM-CRF implementations are provided in [Pretrained Models](docs/Pretrained_Models.md).
 
-This implementation can be used for **Multi-Task Learning**, i.e. learning simultanously several task with non-overlapping datasets. The file [Train_MultiTask.py](Train_MultiTask.py) depicts an example, how the LSTM-CRF network can be used to learn POS-tagging and Chunking simultaneously. The number of tasks are not limited. Tasks can be supervised at the same level or at different output level.
+This implementation can be used for **Multi-Task Learning**, i.e. learning simultanously several task with non-overlapping datasets. The file [Train_MultiTask.py](Train_MultiTask_ATIS.py) depicts an example, how the LSTM-CRF network can be used to learn POS-tagging and Chunking simultaneously. The number of tasks are not limited. Tasks can be supervised at the same level or at different output level.
  
 
 # Citation
