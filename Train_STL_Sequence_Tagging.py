@@ -7,15 +7,16 @@ import logging
 import sys
 from neuralnets.BiLSTM import BiLSTM
 import argparse
+from util.preprocessing import perpareDataset, loadDatasetPickle, prepare_training_data, read_dict
 
-from util.preprocessing import perpareDataset, loadDatasetPickle, readCoNLL, remove_pkl_files,prepare_training_data
 
+# :: Parse arguments
 parser = argparse.ArgumentParser(description="Experiment Slot Filling")
-
 parser.add_argument("-n", "--nb-sentence", dest="nb_sentence", help="Number of training sentence", type=int)
 parser.add_argument("-d", "--directory-name", dest="directory_name", help="Directory Name", required = True, type=str)
-
-
+parser.add_argument("-i", "--input", dest="input_dataset_conf", help="Input dataset configuration", required = True, type=str)
+parser.add_argument("-p", "--param", dest="param_conf", help="Hyperparameters of the network", required=True, type=str)
+parser.add_argument("-e", "--epoch", dest="nb_epoch", help="Number of epoch", default=50, type=int)
 args = parser.parse_args()
 
 # :: Change into the working dir of the script ::
@@ -23,6 +24,7 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
 
+# The  directory to store results
 if os.path.exists("/".join(["results",args.directory_name])) :
     raise ValueError("The directory {} exists".format(args.directory_name))
 else :
@@ -45,20 +47,13 @@ logger.addHandler(ch)
 # Data preprocessing
 #
 ######################################################
-datasets = {
-    'ATIS':                            #Name of the dataset
-        {'columns': {0:'tokens', 1:'atis_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
-         'label': 'atis_BIO',                     #Which column we like to predict
-         'evaluate': True,                   #Should we evaluate on this task? Set true always for single task setups
-         'commentSymbol': None,
-         'nb_sentence': None,
-         'ori': True,
-         'targetTask': True}
-          #Lines in the input data starting with this string will be skipped. Can be used to skip comments
-}
 
+datasets = read_dict(args.input_dataset_conf)
+print("{} {}".format(type(datasets), datasets))
+
+# :: Needed for simulating the low resource scenarios
 if args.nb_sentence is not None :
-    datasets['ATIS']['nb_sentence'] = args.nb_sentence
+    datasets[list(datasets.keys())[0]]['nb_sentence'] = args.nb_sentence
 
 prepare_training_data(datasets)
 
@@ -80,7 +75,7 @@ pickleFile = perpareDataset(embeddingsPath, datasets, reducePretrainedEmbeddings
 embeddings, mappings, data = loadDatasetPickle(pickleFile)
 
 # Some network hyperparameters
-params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.25, 0.25), 'charEmbeddings': 'CNN'}
+params = read_dict(args.param_conf)
 
 model = BiLSTM(params)
 model.setMappings(mappings, embeddings)
@@ -88,4 +83,4 @@ model.setDataset(datasets, data)
 model.storeResults("/".join(["results",args.directory_name,"performance.out"])) #Path to store performance scores for dev / test
 model.predictionSavePath = "/".join(["results", args.directory_name,"predictions","[ModelName]_[Epoch]_[Data].conll"]) #Path to store predictions
 model.modelSavePath = "/".join(["results",args.directory_name,"models/model_[DevScore]_[TestScore]_[Epoch].h5"]) #Path to store models
-model.fit(epochs=50)
+model.fit(epochs=args.nb_epoch)

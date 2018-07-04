@@ -511,3 +511,15 @@ def download(url, destination=os.curdir, silent=False):
         logging.info('Downloaded to: {0}'.format(path))
 
     return path
+
+'''
+    The input for input data conf is following the existing format in dictionary format.
+    This function load the configuration to a dictionary
+    Resource : https://stackoverflow.com/questions/9314824/python-create-dictionary-from-text-file-thats-in-dictionary-format
+'''
+def read_dict(filename) :
+    dict_from_file = None
+    with open(filename, "r") as f:
+        dict_from_file = eval(f.read())
+
+    return dict_from_file
