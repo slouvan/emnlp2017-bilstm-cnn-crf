@@ -34,8 +34,48 @@ def conllWrite(outputPath, sentences, headers):
             fOut.write("\t".join(aceData))
             fOut.write("\n")
         fOut.write("\n")
-        
-        
+
+def readOntoNotes(inputPath, cols, commentSymbol=None, valTransformation=None, portion=1):
+    """
+       Reads in a CoNLL file
+       """
+    sentences = []
+
+    sentenceTemplate = {name: [] for name in cols.values()}
+
+    sentence = {name: [] for name in sentenceTemplate.keys()}
+
+    newData = False
+
+    for line in open(inputPath):
+        line = line.strip()
+        if len(line) == 0 or (commentSymbol != None and line.startswith(commentSymbol)):
+            if newData:
+                sentences.append(sentence)
+
+                sentence = {name: [] for name in sentenceTemplate.keys()}
+                newData = False
+            continue
+        splits = line.split()
+
+        # print(cols)
+        # print(line)
+        # print(splits)
+        for colIdx, colName in cols.items():
+            val = splits[colIdx]
+
+            if valTransformation != None:
+                val = valTransformation(colName, val, splits)
+            sentence[colName].append(val)
+
+        newData = True
+
+    if newData:
+        sentences.append(sentence)
+
+    return sentences
+
+
 def readCoNLL(inputPath, cols, commentSymbol=None, valTransformation=None, portion=1):
     """
     Reads in a CoNLL file

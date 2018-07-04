@@ -28,7 +28,22 @@ def remove_pkl_files():
         print("REMOVING pk file")
         os.remove(f)
 
-def prepare_training_data(datasets) :
+def filter_sent_by_tag(sentences, tags):
+    counter = 0
+    filtered_sentence = []
+    for sentence in sentences :
+        annotations = sentence['CONLL_2003_BIO']
+        unique_tags = set()
+        for annotation in annotations:
+            if annotation.startswith("B-"):
+                field = annotation.split("B-")
+                unique_tags.add(field[1])
+        if tags == unique_tags:
+            filtered_sentence.append(sentence)
+    return filtered_sentence
+
+
+def prepare_training_data(datasets, filter_tags=None) :
     data_folder = 'data'
     # if proportion is < 1.0 then sample from the original training data then output it to train.txt
     for dataset_name, props in datasets.items():
@@ -36,15 +51,23 @@ def prepare_training_data(datasets) :
             from numpy.random import shuffle
             if props['ori'] and os.path.isfile(os.path.join(data_folder,dataset_name,'train.txt.ori')) and props['nb_sentence'] is None:
                 sentences = readCoNLL(os.path.join(data_folder, dataset_name, 'train.txt.ori'), props['columns'])
-                copyfile(os.path.join(data_folder, dataset_name, 'train.txt.ori'), os.path.join(data_folder, dataset_name, 'train.txt'))
+                if filter_tags is not None and 'CONLL_2003_BIO' in sentences[0]:
+                    print("Filtering")
+                    sentences = filter_sent_by_tag(sentences, filter_tags)
+                    dumpConll(os.path.join(data_folder, dataset_name, 'train.txt'), sentences, props['columns'])
+                else :
+                    copyfile(os.path.join(data_folder, dataset_name, 'train.txt.ori'), os.path.join(data_folder, dataset_name, 'train.txt'))
             else:
                 sentences = readCoNLL(os.path.join(data_folder, dataset_name, 'train.txt.ori'), props['columns'])
+                if filter_tags is not None and 'CONLL_2003_BIO' in sentences[0]:
+                    print("Filtering")
+                    sentences = filter_sent_by_tag(sentences, filter_tags)
                 np.random.seed(13)
                 shuffled_indices = np.random.choice(len(sentences), props['nb_sentence'])
                 sentences = np.asarray(sentences)[shuffled_indices].tolist()
                 dumpConll(os.path.join(data_folder, dataset_name, 'train.txt'), sentences, props['columns'])
 
-            print("Total number of {}  is {}".format(dataset_name, len(sentences)))
+            print("Total number of sentence in  {}  is {}".format(dataset_name, len(sentences)))
 
 
 def perpareDataset(embeddingsPath, datasets, frequencyThresholdUnknownTokens=50, labeling_rate = 1.0,reducePretrainedEmbeddings=False, valTransformations=None, padOneTokenSentence=True):

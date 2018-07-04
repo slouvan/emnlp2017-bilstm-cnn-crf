@@ -14,13 +14,18 @@ from util.preprocessing import perpareDataset, loadDatasetPickle, readCoNLL, rem
 from keras import backend as K
 
 parser = argparse.ArgumentParser(description="Experiment Slot Filling")
-parser.add_argument("-l", "--labeling-rate", dest="labeling_rate", help="Labeling Rate", metavar="N", type=float)
+parser.add_argument("-n", "--nb-sentence", dest="nb_sentence", help="Number of training sentence", type=int)
+parser.add_argument("-d", "--directory-name", dest="directory_name", help="Directory Name", required = True, type=str)
 args = parser.parse_args()
 
 # :: Change into the working dir of the script ::
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
+if os.path.exists("/".join(["results",args.directory_name])) :
+    raise ValueError("The directory {} exists".format(args.directory_name))
+else :
+    print("The directory does not exist")
 
 # :: Logging level ::
 loggingLevel = logging.INFO

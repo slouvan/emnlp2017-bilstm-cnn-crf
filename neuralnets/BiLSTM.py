@@ -25,7 +25,7 @@ from collections import defaultdict
 from .keraslayers.ChainCRF import ChainCRF
 
 
-
+os.environ['PYTHONHASHSEED'] = '0'
 
 class BiLSTM:
     def __init__(self, params=None):

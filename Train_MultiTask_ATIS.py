@@ -22,6 +22,10 @@ args = parser.parse_args()
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
+if os.path.exists("/".join(["results",args.directory_name])) :
+    raise ValueError("The directory {} exists".format(args.directory_name))
+else :
+    print("The directory does not exist")
 
 # :: Logging level ::
 loggingLevel = logging.INFO
@@ -84,7 +88,7 @@ if args.nb_sentence is not None :
 
 
 #remove_pkl_files()
-prepare_training_data(datasets)
+prepare_training_data(datasets, filter_tags={'ORG'})
 
 embeddingsPath = 'komninos_english_embeddings.gz' #Word embeddings by Levy et al: https://levyomer.wordpress.com/2014/04/25/dependency-based-word-embeddings/
 

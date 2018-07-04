@@ -1,73 +1,13 @@
 #!/bin/sh
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_ATIS.py -l 0.01
+python Train_MIT_Movie.py -n 200 -d SingleTask_MIT_Movie_200
 wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_MultiTask.py -l 0.01
+python Train_MIT_Movie.py -n 400 -d SingleTask_MIT_Movie_400
 wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_ATIS.py -l 0.05
+python Train_MIT_Movie.py -n 800 -d SingleTask_MIT_Movie_800
 wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_MultiTask.py -l 0.05
+python Train_MultiTask_MIT_Movie.py -n 200 -d MultiTask_MIT_Movie_200
 wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_ATIS.py -l 0.1
+python Train_MultiTask_MIT_Movie.py -n 400 -d MultiTask_MIT_Movie_400
 wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_MultiTask.py -l 0.1
+python Train_MultiTask_MIT_Movie.py -n 800 -d MultiTask_MIT_Movie_800
 wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_ATIS.py -l 0.2
-wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_MultiTask.py -l 0.2
-wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_ATIS.py -l 0.4
-wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_MultiTask.py -l 0.4
-wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_ATIS.py -l 0.6
-wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_MultiTask.py -l 0.6
-wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_ATIS.py -l 0.8
-wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_MultiTask.py -l 0.8
-wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_ATIS.py -l 1.0
-wait
-now=$(date +"%T")
-echo "Current time : $now"
-python Train_MultiTask.py -l 1.0
-wait
-#python Train_ATIS.py -l 0.4
-#wait
-#python Train_ATIS.py -l 0.6
-#wait
-#python Train_ATIS.py -l 0.8
-#wait
-#python Train_ATIS.py -l 1.0
-#wait

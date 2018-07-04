@@ -21,6 +21,10 @@ args = parser.parse_args()
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
+if os.path.exists("/".join(["results",args.directory_name])) :
+    raise ValueError("The directory {} exists".format(args.directory_name))
+else :
+    print("The directory does not exist")
 
 # :: Logging level ::
 loggingLevel = logging.INFO
