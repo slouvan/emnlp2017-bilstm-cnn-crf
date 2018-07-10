@@ -81,6 +81,6 @@ model = BiLSTM(params)
 model.setMappings(mappings, embeddings)
 model.setDataset(datasets, data)
 model.storeResults("/".join(["results",args.directory_name,"performance.out"])) #Path to store performance scores for dev / test
-model.predictionSavePath = "/".join(["results", args.directory_name,"predictions","[ModelName]_[Epoch]_[Data].conll"]) #Path to store predictions
-model.modelSavePath = "/".join(["results",args.directory_name,"models/model_[DevScore]_[TestScore]_[Epoch].h5"]) #Path to store models
+model.predictionSavePath = "/".join(["results", args.directory_name,"predictions","[ModelName]_[Data].conll"]) #Path to store predictions
+model.modelSavePath = "/".join(["results",args.directory_name,"models/[ModelName]_model.h5"]) #Path to store models
 model.fit(epochs=args.nb_epoch)

@@ -1,0 +1,4 @@
+1 B-PER B-PER
+2 I-PER I-PER
+3 O I-PER
+4 O O

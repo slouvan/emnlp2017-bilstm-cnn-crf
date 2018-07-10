@@ -72,6 +72,16 @@ datasets = {
          'nb_sentence' : None,
          'ori': True,
          'targetTask': True},
+    'OntoNotes_NW':  # Name of the dataset
+        {'columns': {0: 'tokens', 1: 'OntoNotes_BIO'},
+         # CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
+         'label': 'OntoNotes_BIO',  # Which column we like to predict
+         'evaluate': False,  # Should we evaluate on this task? Set true always for single task setups
+         'commentSymbol': None,
+         'nb_sentence': None,
+         'ori': True,
+         'targetTask': True
+         },
     'CONLL_2003_NER':                            #Name of the dataset
         {'columns': {0:'tokens', 1:'CONLL_2003_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
          'label': 'CONLL_2003_BIO',                     #Which column we like to predict
@@ -83,6 +93,17 @@ datasets = {
          'ori': True,},              #Lines in the input data starting with this string will be skipped. Can be used to skip comments
 }
 
+'''
+'CONLL_2003_NER':                            #Name of the dataset
+        {'columns': {0:'tokens', 1:'CONLL_2003_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
+         'label': 'CONLL_2003_BIO',                     #Which column we like to predict
+         'evaluate': False,                   #Should we evaluate on this task? Set true always for single task setups
+         'commentSymbol': None,
+         'targetTask' : False,
+         'proportion' : 1,
+         'nb_sentence': None,
+         'ori': True,},              #Lines in the input data starting with this string will be skipped. Can be used to skip comments
+'''
 
 if args.nb_sentence is not None :
     datasets['MIT_Restaurant']['nb_sentence'] = args.nb_sentence

@@ -23,7 +23,7 @@ import random
 import logging
 from collections import defaultdict
 from .keraslayers.ChainCRF import ChainCRF
-
+import datetime
 
 os.environ['PYTHONHASHSEED'] = '0'
 
@@ -36,6 +36,8 @@ class BiLSTM:
         self.predictionSavePath = None
         self.earlyStoppingTargetTask = None
         self.customizedAlternate = None
+        self.current_dev_prediction = None
+        self.current_test_prediction = None
         # Hyperparameters for the network
         defaultParams = {'dropout': (0.5,0.5), 'classifier': ['Softmax'], 'LSTM-Size': (100,), 'customClassifier': {},
                          'optimizer': 'adam',
@@ -441,7 +443,23 @@ class BiLSTM:
 
                     #Save the model
                     if self.modelSavePath != None:
+                        print("IMPROVEMENT... Saving the model {}".format(datetime.datetime.now().time()))
                         self.saveModel(modelName, epoch, dev_score, test_score)
+
+                    labelKey = self.labelKeys[modelName]
+                    idx2Label = self.idx2Labels[modelName]
+
+                    dev_sentences = self.data[modelName]['devMatrix']
+                    test_sentences = self.data[modelName]['testMatrix']
+
+                    correctDevLabels  =  [dev_sentences[idx][labelKey] for idx in range(len(dev_sentences))]
+                    correctTestLabels = [test_sentences[idx][labelKey] for idx in range(len(test_sentences))]
+
+                    if self.predictionSavePath != None:
+                        print("IMPROVEMENT... Saving the prediction {}".format(datetime.datetime.now().time()))
+                        self.savePredictionResults(modelName, dev_sentences, correctDevLabels,   self.current_dev_prediction, idx2Label, epoch, "dev")
+                        self.savePredictionResults(modelName, test_sentences, correctTestLabels, self.current_test_prediction, idx2Label, epoch, "test")
+
                 else:
                     no_improvement_since += 1
                     
@@ -561,10 +579,12 @@ class BiLSTM:
         idx2Label = self.idx2Labels[modelName]
         
         correctLabels = [sentences[idx][labelKey] for idx in range(len(sentences))]
-        predLabels = self.predictLabels(model, sentences) 
+        predLabels = self.predictLabels(model, sentences)
 
-        if self.predictionSavePath != None :
-            self.savePredictionResults(modelName, sentences, correctLabels, predLabels, idx2Label, epoch, mode)
+        if mode == "dev" :
+            self.current_dev_prediction = predLabels
+        if mode == "test" :
+            self.current_test_prediction = predLabels
 
         labelKey = self.labelKeys[modelName]
         encodingScheme = labelKey[labelKey.index('_')+1:]
@@ -634,7 +654,7 @@ class BiLSTM:
         if self.modelSavePath == None:
             raise ValueError('modelSavePath not specified.')
 
-        savePath = self.modelSavePath.replace("[DevScore]", "%.4f" % dev_score).replace("[TestScore]", "%.4f" % test_score).replace("[Epoch]", str(epoch+1)).replace("[ModelName]", modelName)
+        savePath = self.modelSavePath.replace("[ModelName]", modelName)
 
         directory = os.path.dirname(savePath)
         if not os.path.exists(directory):
@@ -657,9 +677,9 @@ class BiLSTM:
             raise ValueError('predictionSavePath not specified.')
         #savePath = self.modelSavePath.replace("[DevScore]", "%.4f" % dev_score).replace("[TestScore]", "%.4f" % test_score).replace( "[Epoch]", str(epoch + 1)).replace("[ModelName]", modelName)
         #print(type(self.predictionSavePath))
-        savePath = self.predictionSavePath.replace("[Epoch]", str(epoch + 1))#.replace("[ModelName]", modelName).replace("[Data]", mode)
+        #savePath = self.predictionSavePath.replace("[Epoch]", str(epoch + 1))#.replace("[ModelName]", modelName).replace("[Data]", mode)
 
-        savePath = savePath.replace("[ModelName]", modelName).replace("[Data]", mode)
+        savePath = self.predictionSavePath.replace("[ModelName]", modelName).replace("[Data]", mode)
         #print(savePath)
         directory = os.path.dirname(savePath)
         if not os.path.exists(directory):
