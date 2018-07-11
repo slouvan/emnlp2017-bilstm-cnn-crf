@@ -136,13 +136,6 @@ model.modelSavePath = "/".join(["results",args.directory_name,"models/model_[Dev
 
 model.fit(epochs=50)
 
-'''
-model.storeResults('results/ATIS_CONLL_Multitask_'+str(datasets['ATIS']['proportion'])+'.csv') #Path to store performance scores for dev / test
-model.predictionSavePath = "results/[ModelName]_MultiTask_"+str(datasets['ATIS']['proportion'])+"_[Epoch]_[Data].conll" #Path to store predictions
-model.modelSavePath = "models/[ModelName]_Multitask_"+str(datasets['ATIS']['proportion'])+"_[[DevScore]_[TestScore]_[Epoch].h5" # labeling_rate
-model.customizedAlternate = True      # Additional params
-'''
-
 
 
 

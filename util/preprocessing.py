@@ -523,3 +523,16 @@ def read_dict(filename) :
         dict_from_file = eval(f.read())
 
     return dict_from_file
+
+'''
+    Returns the dataset name of the target task
+'''
+def get_target_task(datasets) :
+    names = []
+    for key, item in datasets.items():
+        if datasets[key]['evaluate'] :
+            names.append(key)
+    if len(names) > 1:
+        raise("Error in the dataset configuration. There are more than 1 target task")
+
+    return names[0]

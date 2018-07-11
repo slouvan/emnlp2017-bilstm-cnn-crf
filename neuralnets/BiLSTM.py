@@ -24,7 +24,7 @@ import logging
 from collections import defaultdict
 from .keraslayers.ChainCRF import ChainCRF
 import datetime
-
+import json
 os.environ['PYTHONHASHSEED'] = '0'
 
 class BiLSTM:
@@ -49,7 +49,7 @@ class BiLSTM:
             defaultParams.update(params)
         self.params = defaultParams
 
-
+        self.final_max_dev_score = 0
 
     def setMappings(self, mappings, embeddings):
         self.embeddings = embeddings
@@ -105,6 +105,7 @@ class BiLSTM:
 
         
     def buildModel(self):
+        print("Building the model")
         self.models = {}
 
         tokens_input = Input(shape=(None,), dtype='int32', name='words_input')
@@ -437,6 +438,7 @@ class BiLSTM:
                 dev_score, test_score = self.computeScore(modelName, self.data[modelName]['devMatrix'], self.data[modelName]['testMatrix'],epoch=epoch)
 
                 if dev_score > max_dev_score[modelName]:
+                    self.final_max_dev_score = dev_score
                     max_dev_score[modelName] = dev_score
                     max_test_score[modelName] = test_score
                     no_improvement_since = 0
@@ -477,7 +479,8 @@ class BiLSTM:
             if self.params['earlyStopping']  > 0 and no_improvement_since >= self.params['earlyStopping']:
                 logging.info("!!! Early stopping, no improvement after "+str(no_improvement_since)+" epochs !!!")
                 break
-            
+
+
             
     def tagSentences(self, sentences):
         # Pad characters
@@ -671,6 +674,21 @@ class BiLSTM:
             h5file.attrs['modelName'] = modelName
             h5file.attrs['labelKey'] = self.datasets[modelName]['label']
 
+    def saveParams(self, paramFilePath):
+
+        with open(paramFilePath, "w") as f:
+            f.write(json.dumps(self.params))
+
+    def saveParamTuningResults(self, tuningFilePath):
+        mode = ""
+        if os.path.exists(tuningFilePath) :
+            mode = "a"
+        else :
+            mode = "w"
+        print(self.params['dropout'])
+        print(self.final_max_dev_score)
+        with open(tuningFilePath, mode) as f:
+            f.write("{} {} {}\n".format(self.params['dropout'][0], self.params['dropout'][1],self.final_max_dev_score))
 
     def savePredictionResults(self, modelName, sentences, correctLabels,predLabels, idx2Label,epoch, mode = ""):
         if self.predictionSavePath== None:
@@ -700,8 +718,6 @@ class BiLSTM:
                 for token_id in range(len(sentences[idx]['raw_tokens'])):
                     f.write(sentences[idx]['raw_tokens'][token_id]+" "+correctLabel[token_id]+" "+predictedLabel[token_id]+"\n")
                 f.write("\n")
-
-
 
     @staticmethod
     def loadModel(modelPath):
