@@ -74,7 +74,7 @@ datasets = {
          'ori': True,
          'targetTask': True},
 
-    'OntoNotes_NW_Without_Time':                            #Name of the dataset
+    'OntoNotes_NW':                            #Name of the dataset
         {'columns': {0:'tokens', 1:'OntoNotes_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
          'label': 'OntoNotes_BIO',                     #Which column we like to predict
          'evaluate': False,                   #Should we evaluate on this task? Set true always for single task setups
