@@ -17,6 +17,7 @@ parser.add_argument("-d", "--directory-name", dest="directory_name", help="Direc
 parser.add_argument("-i", "--input", dest="input_dataset_conf", help="Input dataset configuration", required = True, type=str)
 parser.add_argument("-p", "--param", dest="param_conf", help="Hyperparameters of the network", required=True, type=str)
 parser.add_argument("-e", "--epoch", dest="nb_epoch", help="Number of epoch", default=50, type=int)
+parser.add_argument("-do","--dropout", dest="dropout_rate", help="Dropout", default=0.25, type=float)
 parser.add_argument("-t", "--tune", dest="tune", default=0, type=int)
 args = parser.parse_args()
 
