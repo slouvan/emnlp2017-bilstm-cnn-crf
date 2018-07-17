@@ -45,7 +45,6 @@ def filter_sent_by_tag(sentences, tags):
 
 def prepare_training_data(datasets, filter_tags=None) :
     data_folder = 'data'
-    # if proportion is < 1.0 then sample from the original training data then output it to train.txt
     for dataset_name, props in datasets.items():
             sentences = None
             from numpy.random import shuffle
@@ -317,6 +316,7 @@ def createMatrices(sentences, mappings, padOneTokenSentence):
     missingTokens = FreqDist()
     paddedSentences = 0
 
+
     for sentence in sentences:
         row = {name: [] for name in list(mappings.keys())+['raw_tokens']}
         
@@ -366,7 +366,7 @@ def createMatrices(sentences, mappings, padOneTokenSentence):
             
         data.append(row)
 
-    if numTokens > 0:           
+    if numTokens > 0:
         logging.info("Unknown-Tokens: %.2f%%" % (numUnknownTokens/float(numTokens)*100))
         
     return data
@@ -386,7 +386,7 @@ def createPklFiles(datasetFiles, mappings, cols, commentSymbol, valTransformatio
     for c in " 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,-_()[]{}!?:;#'\"/\\%$`&=*+@^~|":
         charset[c] = len(charset)
     mappings['characters'] = charset
-    
+
     addCharInformation(trainSentences)
     addCasingInformation(trainSentences)
     
@@ -536,3 +536,13 @@ def get_target_task(datasets) :
         raise("Error in the dataset configuration. There are more than 1 target task")
 
     return names[0]
+
+def get_auxiliary_task(datasets):
+    names = []
+    for key, item in datasets.items():
+        if not datasets[key]['evaluate']:
+            names.append(key)
+
+
+    return names
+

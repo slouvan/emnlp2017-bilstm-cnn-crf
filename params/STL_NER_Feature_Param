@@ -1,0 +1,2 @@
+{'classifier': ['CRF'], 'LSTM-Size': [100, 100], 'dropout': (0.25, 0.25),
+          'featureNames': ['tokens', 'casing', 'NER_CoNLL'], 'addFeatureDimensions': 10}

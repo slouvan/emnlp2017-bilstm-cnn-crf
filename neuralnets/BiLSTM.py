@@ -188,10 +188,12 @@ class BiLSTM:
         logging.info("LSTM-Size: %s" % str(self.params['LSTM-Size']))
         cnt = 1
         for size in self.params['LSTM-Size']:      
-            if isinstance(self.params['dropout'], (list, tuple)):  
+            if isinstance(self.params['dropout'], (list, tuple)):
+                print("LSTM Size loop 1 {}".format(size))
                 shared_layer = Bidirectional(LSTM(size, return_sequences=True, dropout=self.params['dropout'][0], recurrent_dropout=self.params['dropout'][1]), name='shared_varLSTM_'+str(cnt))(shared_layer)
             else:
                 """ Naive dropout """
+                print("LSTM Size loop 1 {}".format(size))
                 shared_layer = Bidirectional(LSTM(size, return_sequences=True), name='shared_LSTM_'+str(cnt))(shared_layer) 
                 if self.params['dropout'] > 0.0:
                     shared_layer = TimeDistributed(Dropout(self.params['dropout']), name='shared_dropout_'+str(self.params['dropout'])+"_"+str(cnt))(shared_layer)
@@ -263,7 +265,7 @@ class BiLSTM:
             model.summary(line_length=200)
             #logging.info(model.get_config())
             #logging.info("Optimizer: %s - %s" % (str(type(model.optimizer)), str(model.optimizer.get_config())))
-            
+
             self.models[modelName] = model
         
 
@@ -719,6 +721,8 @@ class BiLSTM:
                     f.write(sentences[idx]['raw_tokens'][token_id]+" "+correctLabel[token_id]+" "+predictedLabel[token_id]+"\n")
                 f.write("\n")
 
+    def get_params(self):
+        return self.params
     @staticmethod
     def loadModel(modelPath):
         import h5py

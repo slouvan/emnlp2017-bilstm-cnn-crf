@@ -13,7 +13,8 @@ import json
 # :: Parse arguments
 parser = argparse.ArgumentParser(description="Experiment Slot Filling")
 parser.add_argument("-n", "--nb-sentence", dest="nb_sentence", help="Number of training sentence", type=int)
-parser.add_argument("-d", "--directory-name", dest="directory_name", help="Directory Name", required = True, type=str)
+parser.add_argument("-ro", "--root-result", dest="root_dir_result", help="Root directory for results", default="results", type=str)
+parser.add_argument("-d", "--directory-name", dest="directory_name", help="Name it with your experiment name", required = True, type=str)
 parser.add_argument("-i", "--input", dest="input_dataset_conf", help="Input dataset configuration", required = True, type=str)
 parser.add_argument("-p", "--param", dest="param_conf", help="Hyperparameters of the network", required=True, type=str)
 parser.add_argument("-e", "--epoch", dest="nb_epoch", help="Number of epoch", default=50, type=int)
@@ -27,7 +28,7 @@ dname = os.path.dirname(abspath)
 os.chdir(dname)
 
 # The  directory to store results
-if os.path.exists("/".join(["results",args.directory_name])) :
+if os.path.exists("/".join([args.root_dir_result,args.directory_name])) :
     raise ValueError("The directory {} exists".format(args.directory_name))
 else :
     print("The directory does not exist")
@@ -79,14 +80,15 @@ embeddings, mappings, data = loadDatasetPickle(pickleFile)
 # Some network hyperparameters
 params = read_dict(args.param_conf)
 if args.tune == 0 :
+
     model = BiLSTM(params)
     model.setMappings(mappings, embeddings)
     model.setDataset(datasets, data)
-    model.storeResults("/".join(["results",args.directory_name,"performance.out"])) #Path to store performance scores for dev / test
-    model.predictionSavePath = "/".join(["results", args.directory_name,"predictions","[ModelName]_[Data].conll"]) #Path to store predictions
-    model.modelSavePath = "/".join(["results",args.directory_name,"models/[ModelName]_model.h5"]) #Path to store models
+    model.storeResults("/".join([args.root_dir_result,args.directory_name,"performance.out"])) #Path to store performance scores for dev / test
+    model.predictionSavePath = "/".join([args.root_dir_result, args.directory_name,"predictions","[ModelName]_[Data].conll"]) #Path to store predictions
+    model.modelSavePath = "/".join([args.root_dir_result,args.directory_name,"models/[ModelName]_model.h5"]) #Path to store models
     model.fit(epochs=args.nb_epoch)
-    model.saveParams("/".join(["results",args.directory_name,"param"]))
+    model.saveParams("/".join([args.root_dir_result,args.directory_name,"param"]))
 
 else :
     print("Tuning")
@@ -96,9 +98,9 @@ else :
         model = BiLSTM(params)
         model.setMappings(mappings, embeddings)
         model.setDataset(datasets, data)
-        model.storeResults("/".join(["results", args.directory_name, "performance.out"]))  # Path to store performance scores for dev / test
-        model.predictionSavePath = "/".join(["results", args.directory_name, "predictions", "[ModelName]_[Data].conll"])  # Path to store predictions
-        model.modelSavePath = "/".join(["results", args.directory_name, "models/[ModelName]_model.h5"])  # Path to store models
+        model.storeResults("/".join([args.root_dir_result, args.directory_name, "performance.out"]))  # Path to store performance scores for dev / test
+        model.predictionSavePath = "/".join([args.root_dir_result, args.directory_name, "predictions", "[ModelName]_[Data].conll"])  # Path to store predictions
+        model.modelSavePath = "/".join([args.root_dir_result, args.directory_name, "models/[ModelName]_model.h5"])  # Path to store models
         model.fit(epochs=args.nb_epoch)
-        model.saveParams("/".join(["results", args.directory_name, "param"]))
-        model.saveParamTuningResults("/".join(["results", args.directory_name, "tuning_results"]))
+        model.saveParams("/".join([args.root_dir_result, args.directory_name, "param"]))
+        model.saveParamTuningResults("/".join([args.root_dir_result, args.directory_name, "tuning_results"]))

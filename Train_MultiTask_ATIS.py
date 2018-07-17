@@ -72,8 +72,7 @@ datasets = {
          'proportion': 0.6,
          'nb_sentence' : None,
          'ori': True},
-
-    'OntoNotes_NW':  # Name of the dataset
+    'OntoNotes_NW_Without_Numbers_Time':  # Name of the dataset
         {'columns': {0: 'tokens', 1: 'OntoNotes_BIO'},
          # CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
          'label': 'OntoNotes_BIO',  # Which column we like to predict
@@ -82,10 +81,7 @@ datasets = {
          'nb_sentence': None,
          'ori': True,
          'targetTask': True
-         },
-
-# Lines in the input data starting with this string will be skipped. Can be used to skip comments
-
+         }, # Lines in the input data starting with this string will be skipped. Can be used to skip comments
 }
 
 '''

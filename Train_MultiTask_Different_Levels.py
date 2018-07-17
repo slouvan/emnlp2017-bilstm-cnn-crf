@@ -9,14 +9,29 @@ import os
 import logging
 import sys
 from neuralnets.BiLSTM import BiLSTM
-from util.preprocessing import perpareDataset, loadDatasetPickle,prepare_training_data
-
+from util.preprocessing import perpareDataset, loadDatasetPickle,prepare_training_data, read_dict, get_target_task, get_auxiliary_task
+import argparse
 from keras import backend as K
+
+parser = argparse.ArgumentParser(description="Experiment Slot Filling")
+parser.add_argument("-n", "--nb-sentence", dest="nb_sentence", help="Number of training sentence", type=int)
+parser.add_argument("-ro", "--root-result", dest="root_dir_result", help="Root directory for results", default="results", type=str)
+parser.add_argument("-d", "--directory-name", dest="directory_name", help="Directory Name", required = True, type=str)
+parser.add_argument("-i", "--input", dest="input_dataset_conf", help="Input dataset configuration", required = True, type=str)
+parser.add_argument("-p", "--param", dest="param_conf", help="Hyperparameters of the network", required=True, type=str)
+parser.add_argument("-e", "--epoch", dest="nb_epoch", help="Number of epoch", default=50, type=int)
+parser.add_argument("-t", "--tune", dest="tune", default=0, type=int)
+parser.add_argument("-r", "--run", dest="nb_run", default =1, type = int)
+args = parser.parse_args()
 
 # :: Change into the working dir of the script ::
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
+if os.path.exists("/".join([args.root_dir_result,args.directory_name])) :
+    raise ValueError("The directory {} exists".format(args.directory_name))
+else :
+    print("The directory does not exist")
 
 # :: Logging level ::
 loggingLevel = logging.INFO
@@ -55,24 +70,12 @@ datasets = {
 # Data preprocessing
 #
 ######################################################
-datasets = {
-    'MIT_Restaurant':                            #Name of the dataset
-        {'columns': {0:'tokens', 1:'restaurant_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
-         'label': 'restaurant_BIO',                     #Which column we like to predict
-         'evaluate': True,                   #Should we evaluate on this task? Set true always for single task setups
-         'commentSymbol': None,
-         'proportion': 1,
-         'ori': True,
-         'targetTask': True},
-    'CONLL_2003_NER':                            #Name of the dataset
-        {'columns': {0:'tokens', 1:'CONLL_2003_BIO'},   #CoNLL format for the input data. Column 1 contains tokens, column 3 contains POS information
-         'label': 'CONLL_2003_BIO',                     #Which column we like to predict
-         'evaluate': False,                   #Should we evaluate on this task? Set true always for single task setups
-         'commentSymbol': None,
-         'targetTask' : False,
-         'proportion' : 1,
-         'ori': True,},              #Lines in the input data starting with this string will be skipped. Can be used to skip comments
-}
+datasets = read_dict(args.input_dataset_conf)
+print("DATASET CONF {} {}".format(type(datasets), datasets))
+target_task = get_target_task(datasets)
+print("TARGET TASK {} {}".format(type(target_task), target_task))
+aux_task = get_auxiliary_task(datasets)
+print("AUX TASK {} {}".format(type(aux_task), aux_task))
 
 prepare_training_data(datasets)
 
@@ -96,15 +99,25 @@ embeddings, mappings, data = loadDatasetPickle(pickleFile)
 # Some network hyperparameters
 #params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.25, 0.25),'charEmbeddings': 'CNN',
 #          'customClassifier': {'unidep_pos': ['Softmax'], 'conll2000_chunking': [('LSTM', 50), 'CRF']}}
+
+# TODO Replace customClassifier dengan main task + auxiliary task
+custom_classifier = {}
+custom_classifier[target_task] = [('LSTM', 100), 'CRF']
+for task in aux_task :
+    custom_classifier[task] = ['CRF']
+
 params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.25, 0.25),'charEmbeddings': 'CNN',
-          'customClassifier': {'MIT_Restaurant': ['CRF'], 'CONLL_2003_NER': [('LSTM', 50), 'CRF']}}
+          'customClassifier': custom_classifier}
+
+
 model = BiLSTM(params)
+
 model.setMappings(mappings, embeddings)
 model.setDataset(datasets, data)
-model.storeResults('results/MIT_Restaurant_CONLL_MultitaskDifferentLevel_'+str(datasets['MIT_Restaurant']['proportion'])+'.csv') #Path to store performance scores for dev / test
-
-model.modelSavePath = "models/[ModelName]_MultitaskDifferentLevel_[DevScore]_[TestScore]_[Epoch].h5"
-model.fit(epochs=50)
+model.storeResults("/".join([args.root_dir_result, args.directory_name, "performance.out"]))  # Path to store performance scores for dev / test
+model.predictionSavePath = "/".join([args.root_dir_result, args.directory_name, "predictions", "[ModelName]_[Data].conll"])  # Path to store predictions
+model.modelSavePath = "/".join([args.root_dir_result, args.directory_name, "models/[ModelName].h5"])  # Path to store models
+model.fit(epochs=args.nb_epoch)
 
 
 
