@@ -10,8 +10,14 @@ from .CoNLL import dumpConll
 from .WordEmbeddings import wordNormalize
 from .CoNLL import readCoNLL
 from shutil import copyfile
-
+from collections import defaultdict
+import scipy
 import sys
+from .constants import DATA_DIR, INPUT_DIR, TASKS
+import math
+from scipy.linalg import svd
+from collections import defaultdict
+
 if (sys.version_info > (3, 0)):
     import pickle as pkl
 else: #Python 2.7 imports
@@ -28,18 +34,26 @@ def remove_pkl_files():
         print("REMOVING pk file")
         os.remove(f)
 
-def filter_sent_by_tag(sentences, tags):
+def retag_sentences(sentences, relevant_tags, column, task):
     counter = 0
     filtered_sentence = []
-    for sentence in sentences :
-        annotations = sentence['CONLL_2003_BIO']
-        unique_tags = set()
-        for annotation in annotations:
-            if annotation.startswith("B-"):
-                field = annotation.split("B-")
-                unique_tags.add(field[1])
-        if tags == unique_tags:
-            filtered_sentence.append(sentence)
+    assert("BIO" in column)
+    for idx, sentence in enumerate(sentences):
+        original_labels = sentence[column]
+        retag_labels = []
+        retag_happened = False
+        for label in original_labels:
+            if get_label_name(label) != "O" and get_label_name(label) not in relevant_tags[task]:
+                #print("Retag happening from {} to {} in task {}, relevant tags are : {}".format(label, "O", task, list(relevant_tags[task])))
+                retag_labels.append("O")
+                retag_happened = True
+            else :
+                retag_labels.append(label)
+        sentences[idx][column] = retag_labels
+        assert (len(original_labels) == len(retag_labels))
+        filtered_sentence.append(sentence)
+
+    assert(len(sentences) == len(filtered_sentence))
     return filtered_sentence
 
 
@@ -50,17 +64,17 @@ def prepare_training_data(datasets, filter_tags=None) :
             from numpy.random import shuffle
             if props['ori'] and os.path.isfile(os.path.join(data_folder,dataset_name,'train.txt.ori')) and props['nb_sentence'] is None:
                 sentences = readCoNLL(os.path.join(data_folder, dataset_name, 'train.txt.ori'), props['columns'])
-                if filter_tags is not None and 'CONLL_2003_BIO' in sentences[0]:
-                    print("Filtering")
-                    sentences = filter_sent_by_tag(sentences, filter_tags)
+                if filter_tags is not None and dataset_name != get_target_task(datasets):
+                    print("Retagging {}".format(dataset_name))
+                    sentences = retag_sentences(sentences, filter_tags, props['columns'][1], dataset_name)
                     dumpConll(os.path.join(data_folder, dataset_name, 'train.txt'), sentences, props['columns'])
                 else :
                     copyfile(os.path.join(data_folder, dataset_name, 'train.txt.ori'), os.path.join(data_folder, dataset_name, 'train.txt'))
             else:
                 sentences = readCoNLL(os.path.join(data_folder, dataset_name, 'train.txt.ori'), props['columns'])
-                if filter_tags is not None and 'CONLL_2003_BIO' in sentences[0]:
-                    print("Filtering")
-                    sentences = filter_sent_by_tag(sentences, filter_tags)
+                if filter_tags is not None and dataset_name != get_target_task(datasets):
+                    print("Retagging")
+                    sentences = retag_sentences(sentences, filter_tags, props['columns'][1], dataset_name)
                 np.random.seed(13)
                 shuffled_indices = np.random.choice(len(sentences), props['nb_sentence'])
                 sentences = np.asarray(sentences)[shuffled_indices].tolist()
@@ -546,3 +560,349 @@ def get_auxiliary_task(datasets):
 
     return names
 
+def build_vocab_from_domains(domains):
+    word2idx = {}
+    print(len(word2idx))
+    for domain in domains :
+        sentences_in_domain = readCoNLL(os.path.join(DATA_DIR, domain,"train.txt.ori"), {0:'tokens'})
+        for sentence_idx in range(len(sentences_in_domain)):
+            tokens = sentences_in_domain[sentence_idx]['tokens']
+            for token in tokens :
+                if token.lower() not in word2idx.keys() :
+                    word2idx[token.lower()] = len(word2idx)
+
+    return word2idx
+
+def build_all_domain_term_dist(domains, word2idx) :
+    domain_to_term_dist = {}
+    for domain in domains :
+        domain_to_term_dist[domain] = create_term_dist(domain, word2idx)
+
+    return domain_to_term_dist
+
+def create_term_dist(domain, word2idx) :
+    term_dist = np.zeros(len(word2idx))
+    sentences_in_domain = readCoNLL(os.path.join(DATA_DIR, domain,"train.txt.ori"), {0: 'tokens'})
+    for sentence_idx in range(len(sentences_in_domain)) :
+        tokens = sentences_in_domain[sentence_idx]['tokens']
+        for token in tokens :
+            term_dist[word2idx[token.lower()]] += 1
+
+    term_dist = term_dist / np.sum(term_dist)
+
+    return term_dist
+
+def get_most_similar_domain(target_domain, domains, domain_to_term_dist):
+
+    best_similarity_score , most_similar_domain = 0, None
+    for source_domain in domains:
+        if source_domain != target_domain:
+            similarity_score = get_similarity_score(domain_to_term_dist[source_domain], domain_to_term_dist[target_domain])
+            if similarity_score > best_similarity_score :
+                best_similarity_score = similarity_score
+                most_similar_domain = source_domain
+
+    return most_similar_domain, best_similarity_score
+
+
+# From Sebastian Ruder
+# https://github.com/sebastianruder/learn-to-select-data/blob/5a5fe2428a465d6d0a7a6ffbd47c89baffc09531/similarity.py
+
+def get_similarity_score(repr1, repr2) :
+    avg_repr = 0.5 * (repr1 + repr2)
+    sim = 1 - 0.5 * (scipy.stats.entropy(repr1, avg_repr) + scipy.stats.entropy(repr2, avg_repr))
+    if np.isinf(sim):
+        # the similarity is -inf if no term in the document is in the vocabulary
+        return 0
+    return sim
+
+def read_dict_data(domain_names) :
+    dict_from_file = None
+    all_data = {}
+    for domain in domain_names:
+        with open(os.path.join(INPUT_DIR, domain), "r") as f:
+            dict_from_file = eval(f.read())
+            all_data[domain] = dict_from_file[domain]
+    return all_data
+
+
+def set_target_task(datasets, target_task) :
+    keys = list(datasets.keys())
+    for key in keys:
+        if key == target_task:
+            datasets[key]['evaluate'] = True
+        else :
+            datasets[key]['evaluate'] = False
+
+def get_label_name(token_label) :
+    if token_label == "O" :
+        return "O"
+    if token_label.startswith("B-") and token_label.startswith("I-"):
+        raise ValueError("Wrong annotation format")
+
+    if token_label.startswith("B-"):
+        fields = token_label.split("B-")
+        return fields[1]
+    elif token_label.startswith("I-"):
+        fields = token_label.split("I-")
+        return fields[1]
+
+
+def build_indexes_from_domains(domains):
+    word2idx = {}
+    label2idx = {}
+
+    for domain in domains:
+        sentences_in_domain = readCoNLL(os.path.join(DATA_DIR, domain, "train.txt.ori"), {0: 'tokens', 1: 'labels'})
+        print(" Number of sentences in {} : {}".format(domain, len(sentences_in_domain)))
+        for sentence_idx in range(len(sentences_in_domain)):
+            #if sentence_idx % 1000 == 0:
+            #    print("{}".format(sentence_idx))
+            tokens = sentences_in_domain[sentence_idx]['tokens']
+            labels = sentences_in_domain[sentence_idx]['labels']
+            for token_idx in range(len(tokens)):
+                if tokens[token_idx].lower() not in word2idx.keys():
+                    word2idx[tokens[token_idx].lower()] = len(word2idx)
+                label = get_label_name(labels[token_idx])
+                if label not in label2idx.keys():
+                    label2idx[label] = len(label2idx)
+
+    idx2label = { v : k for k, v in label2idx.items()}
+    idx2word  = { v : k for k, v in word2idx.items()}
+
+    idx = {'word2idx' : word2idx, 'idx2word': idx2word, 'label2idx' : label2idx, 'idx2label' : idx2label}
+    print("{} {}".format(len(word2idx), len(label2idx)))
+    return idx
+
+def build_matrix_from_domains(domains, idx) :
+
+    label_count = defaultdict(int)
+    word_count = defaultdict(int)
+    label_word_count = np.zeros((len(idx['label2idx']), len(idx['word2idx'])))
+    for domain in domains:
+        sentences_in_domain = readCoNLL(os.path.join(DATA_DIR, domain, "train.txt.ori"), {0: 'tokens', 1: 'labels'})
+        for sentence_idx in range(len(sentences_in_domain)):
+            tokens = sentences_in_domain[sentence_idx]['tokens']
+            labels = sentences_in_domain[sentence_idx]['labels']
+            for token_idx in range(len(tokens)):
+                token = tokens[token_idx].lower()
+                label = get_label_name(labels[token_idx])
+                label_count[label] += 1
+                word_count[token] += 1
+                label_word_count[idx['word2idx'][token], idx['label2idx'][label]] += 1
+
+    original_matrix = np.zeros((len(idx['label2idx']), len(idx['word2idx'])))
+    for i in range(label_word_count.shape[0]):
+        for j in range(label_word_count.shape[1]):
+            original_matrix[i, j] = label_word_count[i,j] / math.sqrt(label_count[idx['idx2label'][i]] * word_count[idx['idx2word'][j]])
+
+    return original_matrix
+
+def get_svd(matrix) :
+    return svd(matrix)
+
+def build_vocab(domains):
+    word_count = defaultdict(int)
+    for domain in domains:
+        sentences_in_domain = readCoNLL(os.path.join(DATA_DIR, domain, "train.txt.ori"), {0: 'tokens', 1: 'labels'})
+        print(" Number of sentences in {} : {}".format(domain, len(sentences_in_domain)))
+        for sentence_idx in range(len(sentences_in_domain)):
+            tokens = sentences_in_domain[sentence_idx]['tokens']
+            for token_idx in range(len(tokens)):
+                token = tokens[token_idx].lower()
+                word_count[token] += 1
+    return word_count
+
+
+def build_indexes_from_domains(domains, word_count, threshold=5):
+    word2idx = {}
+    label2idx = {}
+    domain2label = {}
+    for domain in domains:
+        sentences_in_domain = readCoNLL(os.path.join(DATA_DIR, domain, "train.txt.ori"), {0: 'tokens', 1: 'labels'})
+        print(" Number of sentences in {} : {}".format(domain, len(sentences_in_domain)))
+        labels_in_domain = set()
+        for sentence_idx in range(len(sentences_in_domain)):
+            tokens = sentences_in_domain[sentence_idx]['tokens']
+            labels = sentences_in_domain[sentence_idx]['labels']
+
+            for token_idx in range(len(tokens)):
+                token = tokens[token_idx].lower()
+                label = get_label_name(labels[token_idx])
+                if label not in label2idx.keys() and label != "O":
+                    label2idx[label] = len(label2idx)
+                    labels_in_domain.add(label)
+                if token not in word2idx.keys() and word_count[token] >= threshold:
+                    word2idx[token] = len(word2idx)
+        domain2label[domain] = list(labels_in_domain)
+
+    idx2label = {v: k for k, v in label2idx.items()}
+    idx2word  = {v: k for k, v in word2idx.items()}
+
+    idx = {'word2idx': word2idx, 'idx2word': idx2word, 'label2idx': label2idx, 'idx2label': idx2label, 'domain2label': domain2label}
+    print("Word : {} Label :{}".format(len(word2idx), len(label2idx)))
+    return idx
+
+
+def build_matrix_from_domains(domains, idx, word_count):
+    label_count = defaultdict(int)
+    label_word_count = np.zeros((len(idx['label2idx']), len(idx['word2idx'])))
+    for domain in domains:
+        sentences_in_domain = readCoNLL(os.path.join(DATA_DIR, domain, "train.txt.ori"), {0: 'tokens', 1: 'labels'})
+        for sentence_idx in range(len(sentences_in_domain)):
+            tokens = sentences_in_domain[sentence_idx]['tokens']
+            labels = sentences_in_domain[sentence_idx]['labels']
+            for token_idx in range(len(tokens)):
+                token = tokens[token_idx].lower()
+                label = get_label_name(labels[token_idx])
+                if token in idx['word2idx'].keys() and label != "O" and label != "LAW":
+                    label_count[label] += 1
+                    label_word_count[idx['label2idx'][label], idx['word2idx'][token]] += 1
+
+    original_matrix = np.zeros((len(idx['label2idx']), len(idx['word2idx'])))
+
+    print(label_count)
+    for i in range(label_word_count.shape[0]):
+        for j in range(label_word_count.shape[1]):
+            if math.sqrt(label_count[idx['idx2label'][i]] * word_count[idx['idx2word'][j]]) != 0:
+                original_matrix[i, j] = label_word_count[i, j] / math.sqrt(
+                    label_count[idx['idx2label'][i]] * word_count[idx['idx2word'][j]])
+
+    return original_matrix
+
+
+def build_vocab(domains):
+    word_count = defaultdict(int)
+    for domain in domains:
+        sentences_in_domain = readCoNLL(os.path.join(DATA_DIR, domain, "train.txt.ori"), {0: 'tokens', 1: 'labels'})
+        print(" Number of sentences in {} : {}".format(domain, len(sentences_in_domain)))
+        for sentence_idx in range(len(sentences_in_domain)):
+            # if sentence_idx % 1000 == 0:
+            #    print("{}".format(sentence_idx))
+            tokens = sentences_in_domain[sentence_idx]['tokens']
+            labels = sentences_in_domain[sentence_idx]['labels']
+            for token_idx in range(len(tokens)):
+                token = tokens[token_idx].lower()
+                word_count[token] += 1
+    return word_count
+
+
+def build_indexes_from_domains(domains, word_count, threshold=5):
+    word2idx = {}
+    label2idx = {}
+    domain2label = {}
+    for domain in domains:
+        sentences_in_domain = readCoNLL(os.path.join(DATA_DIR, domain, "train.txt.ori"), {0: 'tokens', 1: 'labels'})
+        print(" Number of sentences in {} : {}".format(domain, len(sentences_in_domain)))
+        labels_in_domain = set()
+        for sentence_idx in range(len(sentences_in_domain)):
+            tokens = sentences_in_domain[sentence_idx]['tokens']
+            labels = sentences_in_domain[sentence_idx]['labels']
+            for token_idx in range(len(tokens)):
+                token = tokens[token_idx].lower()
+                label = get_label_name(labels[token_idx])
+                if label not in label2idx.keys() and label != "O":
+                    label2idx[label] = len(label2idx)
+                    labels_in_domain.add(label)
+                if token not in word2idx.keys() and word_count[token] >= threshold:
+                    word2idx[token] = len(word2idx)
+        domain2label[domain] = list(labels_in_domain)
+
+    idx2label = {v: k for k, v in label2idx.items()}
+    idx2word = {v: k for k, v in word2idx.items()}
+
+    idx = {'word2idx': word2idx, 'idx2word': idx2word, 'label2idx': label2idx, 'idx2label': idx2label,
+           'domain2label': domain2label}
+    print("Word : {} Label :{}".format(len(word2idx), len(label2idx)))
+    return idx
+
+
+from collections import defaultdict
+import numpy as np
+import math
+
+
+def build_matrix_from_domains(domains, idx, word_count, k=50):
+    label_count = defaultdict(int)
+    label_word_count = np.zeros((len(idx['label2idx']), len(idx['word2idx'])))
+    for domain in domains:
+        sentences_in_domain = readCoNLL(os.path.join(DATA_DIR, domain, "train.txt.ori"), {0: 'tokens', 1: 'labels'})
+        for sentence_idx in range(len(sentences_in_domain)):
+            tokens = sentences_in_domain[sentence_idx]['tokens']
+            labels = sentences_in_domain[sentence_idx]['labels']
+            for token_idx in range(len(tokens)):
+                token = tokens[token_idx].lower()
+                label = get_label_name(labels[token_idx])
+                if token in idx['word2idx'].keys() and label != "O" and label != "LAW":
+                    label_count[label] += 1
+                    label_word_count[idx['label2idx'][label], idx['word2idx'][token]] += 1
+
+    original_matrix = np.zeros((len(idx['label2idx']), len(idx['word2idx'])))
+
+    for i in range(label_word_count.shape[0]):
+        for j in range(label_word_count.shape[1]):
+            if math.sqrt(label_count[idx['idx2label'][i]] * word_count[idx['idx2word'][j]]) != 0:
+                original_matrix[i, j] = label_word_count[i, j] / math.sqrt(
+                    label_count[idx['idx2label'][i]] * word_count[idx['idx2word'][j]])
+
+    from scipy.linalg import svd
+    M1, M2, M3 = svd(original_matrix)
+    row_sums = M1.sum(axis=1)
+    normalized_matrix = M1 / row_sums[:, np.newaxis]
+
+    ranked_k = normalized_matrix[:, :k]
+    return ranked_k
+
+
+def get_label_mapping(domain1, domain2, matrix, idxs):
+    for label1 in idxs['domain2label'][domain1]:
+        highest_sim_score = -1000000000000
+        nearest_neighbor = None
+        for label2 in idxs['domain2label'][domain2]:
+            score = get_similarity(ranked_k[idxs['label2idx'][label1]], ranked_k[idxs['label2idx'][label2]])
+            if score > highest_sim_score:
+                highest_sim_score = score
+                nearest_neighbor = label2
+        print("The nearest neighbor for {} is {} with the score of {}".format(label1, nearest_neighbor,
+                                                                              highest_sim_score))
+
+
+from scipy.spatial.distance import cosine, euclidean
+
+
+def get_similarity(repr1, repr2):
+    return 1 - cosine(repr1, repr2)
+
+
+def get_distance(repr1, repr2):
+    return euclidean(repr1, repr2)
+
+
+def get_nearest_labels(target_task, aux_tasks, matrix, idxs, sim_threshold=0.1):
+    nearest_labels = {}
+
+    for aux_task in aux_tasks:
+        unique_labels = set()
+        for label1 in idxs['domain2label'][target_task]:
+            highest_sim_score = -1000000000000
+            nearest_neighbor = None
+            for label2 in idxs['domain2label'][aux_task]:
+                if not np.any(matrix[idxs['label2idx'][label1]]) or not np.any(matrix[idxs['label2idx'][label2]]):
+                    continue
+                score = get_similarity(matrix[idxs['label2idx'][label1]], matrix[idxs['label2idx'][label2]])
+                if score > highest_sim_score:
+                    highest_sim_score = score
+                    nearest_neighbor = label2
+            # print("The nearest neighbor for {} is {} with the score of {}".format(label1, nearest_neighbor, highest_sim_score))
+            if highest_sim_score >= sim_threshold:
+                unique_labels.add(nearest_neighbor)
+        nearest_labels[aux_task] = unique_labels
+        #print("Nearest labels from {}  is {}".format(aux_task, str(unique_labels)))
+
+    return nearest_labels
+
+def compute_label_embeddings (target_task, aux_tasks):
+    word_count = build_vocab(target_task + aux_tasks)
+    idxs = build_indexes_from_domains(target_task + aux_tasks, word_count)
+    matrix = build_matrix_from_domains(target_task + aux_tasks, idxs, word_count)
+    return get_nearest_labels(target_task[0], aux_tasks, matrix,idxs, sim_threshold=0.1)

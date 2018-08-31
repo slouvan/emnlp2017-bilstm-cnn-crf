@@ -44,3 +44,11 @@ out
 out_conll_parse
 
 out_feature
+
+reproduce/
+
+notebook/\.ipynb_checkpoints/
+
+results_backup/
+
+\.DS_Store
