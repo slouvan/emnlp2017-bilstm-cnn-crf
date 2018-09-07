@@ -50,11 +50,14 @@ class BiLSTM:
         self.params = defaultParams
 
         self.final_max_dev_score = 0
+        self.batchRangeLength = None
 
     def setMappings(self, mappings, embeddings):
         self.embeddings = embeddings
         self.mappings = mappings
 
+    def setBatchRangeLength(self, batchRangeLength):
+        self.batchRangeLength = batchRangeLength
 
     def setDataset(self, datasets, data, mainModelName=None):
         self.datasets = datasets
@@ -303,10 +306,7 @@ class BiLSTM:
                 total_sentence[modelName] += len(nnInput[0])
                 self.models[modelName].train_on_batch(nnInput, nnLabels)
 
-
         print("Total training sentence : {}".format(total_sentence))
-                               
-            
           
 
     def minibatch_iterate_dataset(self, modelNames = None):
@@ -319,6 +319,7 @@ class BiLSTM:
             self.trainMiniBatchRanges = {}            
             for modelName in self.modelNames:
                 trainData = self.data[modelName]['trainMatrix']
+                print("Number of training data for {} is {}".format(modelName, len(trainData)))
                 trainData.sort(key=lambda x:len(x['tokens'])) #Sort train matrix by sentence length
                 trainRanges = []
                 oldSentLength = len(trainData[0]['tokens'])            
@@ -336,8 +337,7 @@ class BiLSTM:
                 
                 #Add last sentence
                 trainRanges.append((idxStart, len(trainData)))
-                
-                
+
                 #Break up ranges into smaller mini batch sizes
                 miniBatchRanges = []
                 for batchRange in trainRanges:
@@ -374,22 +374,50 @@ class BiLSTM:
      
         
         #Iterate over the mini batch ranges
+
         if self.mainModelName != None:
             rangeLength = len(self.trainMiniBatchRanges[self.mainModelName])
         else:
             rangeLength = min([len(self.trainMiniBatchRanges[modelName]) for modelName in modelNames])
 
+        #print("Self.mainModelName : {}  rangeLength : {} max : {}".format(self.mainModelName, rangeLength, maxRangeLength))
+
+        # Same number of batches between main task and aux tasks
+        if self.batchRangeLength is not None and self.batchRangeLength == "max" :
+            print("Picking up max range length")
+            from copy import deepcopy
+            maxRangeLength = max([len(self.trainMiniBatchRanges[modelName]) for modelName in modelNames])
+            rangeLength = maxRangeLength
+            for modelName in modelNames :
+                # Check how many sentences in the range
+                total_sent = 0
+                for elmt in self.trainMiniBatchRanges[modelName]:
+                    total_sent += elmt[1] - elmt[0]
+                #print("Total sent for {} is {}".format(modelName, total_sent))
+                # compute the range difference for this model batch to the max
+                mult = maxRangeLength / len(self.trainMiniBatchRanges[modelName])
+                modulo = maxRangeLength % len(self.trainMiniBatchRanges[modelName])
+                self.trainMiniBatchRanges[modelName] = self.trainMiniBatchRanges[modelName] * int(mult)
+                #print("Len of self.trainMiniBatchRanges[modelName] {} ".format(len(self.trainMiniBatchRanges[modelName])))
+                temp = deepcopy(self.trainMiniBatchRanges[modelName])
+
+                for i in range(modulo) :
+                    #print("{} {}".format(i, len(temp)))
+                    self.trainMiniBatchRanges[modelName].append(temp[i % len(temp)])
+
+        print("Batches for the models ")
+        for modelName in modelNames:
+            print("Range length for {} is {}".format(modelName, len(self.trainMiniBatchRanges[modelName])))
+
         
         batches = {}
         for idx in range(rangeLength):
             batches.clear()
-            
             for modelName in modelNames:   
                 trainMatrix = self.data[modelName]['trainMatrix']
                 dataRange = self.trainMiniBatchRanges[modelName][idx % len(self.trainMiniBatchRanges[modelName])] 
                 labels = np.asarray([trainMatrix[idx][self.labelKeys[modelName]] for idx in range(dataRange[0], dataRange[1])])
                 labels = np.expand_dims(labels, -1)
-                
                 
                 batches[modelName] = [labels]
                 

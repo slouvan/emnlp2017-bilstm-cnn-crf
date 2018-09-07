@@ -21,6 +21,7 @@ parser.add_argument("-target", dest="target_task", required=True, help="Target T
 parser.add_argument("-strategy", dest="strategy", help="Strategy for resource selection", required=True, type=str)
 parser.add_argument("-n", "--nb-sentence", dest="nb_sentence", help="Number of training sentence", type=int)
 parser.add_argument("-ner", dest="ner", default=0, type=int)
+parser.add_argument("-ner-name", dest="ner_name", default=None)
 parser.add_argument("-diff-level", dest="different_level", default=0, type=int)
 parser.add_argument("-ro", "--root-result", dest="root_dir_result", help="Root directory for results", default="results", type=str)
 parser.add_argument("-label-embedding", dest="label_embedding", help="Label Embedding Cache", default=None, type=str)
@@ -29,6 +30,7 @@ parser.add_argument("-r", "--run", dest="nb_run", default =1, type = int)
 parser.add_argument("-p", "--param", dest="param_conf", help="Hyperparameters of the network", required=True, type=str)
 parser.add_argument("-e", "--epoch", dest="nb_epoch", help="Number of epoch", default=50, type=int)
 parser.add_argument("-t", "--tune", dest="tune", default=0, type=int)
+parser.add_argument("-br", "--batch-range", dest="batch_range", default=None, type=str)
 
 '''
 parser.add_argument("-i", "--input", dest="input_dataset_conf", help="Input dataset configuration", required = True, type=str)
@@ -102,18 +104,41 @@ params = read_dict(args.param_conf)
 print("{} {}".format(type(params), params))
 
 if args.ner == 1:
-    aux_task = aux_task + NERS
-    if args.different_level == 1:
-        custom_classifier = {} # Assuming NER always on the bottom
-        custom_classifier[target_task[0]] = [('LSTM', 100), 'CRF']
-        for task in aux_task:
-            if task in NERS :
-                custom_classifier[task] = ['CRF']
-            else :
-                custom_classifier[task] = [('LSTM', 100), 'CRF']
+    if args.ner_name is None:
+        aux_task = aux_task + NERS
+        if args.different_level == 1:
+            custom_classifier = {} # Assuming NER always on the bottom
+            custom_classifier[target_task[0]] = [('LSTM', 100), 'CRF']
+            for task in aux_task:
+                if task in NERS :
+                    custom_classifier[task] = ['CRF']
+                else :
+                    custom_classifier[task] = [('LSTM', 100), 'CRF']
 
-        params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.25, 0.25), 'charEmbeddings': 'CNN',
-                  'customClassifier': custom_classifier}
+            params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.25, 0.25), 'charEmbeddings': 'CNN',
+                      'customClassifier': custom_classifier}
+        else :
+            params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.25, 0.25), 'charEmbeddings': 'CNN'}
+    else :
+        for NER in NERS:
+            print(NER)
+            if NER == args.ner_name:
+                print("{} is the NER aux task".format(NER))
+                aux_task.append(NER)
+                break
+        if args.different_level == 1:
+            custom_classifier = {}  # Assuming NER always on the bottom
+            custom_classifier[target_task[0]] = [('LSTM', 100), 'CRF']
+            for task in aux_task:
+                if task in NERS:
+                    custom_classifier[task] = ['CRF']
+                else:
+                    custom_classifier[task] = [('LSTM', 100), 'CRF']
+
+            params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.25, 0.25), 'charEmbeddings': 'CNN',
+                      'customClassifier': custom_classifier}
+        else :
+            params = {'classifier': ['CRF'], 'LSTM-Size': [100], 'dropout': (0.25, 0.25), 'charEmbeddings': 'CNN'}
 
 print("Target task : {}\t Aux task : {}".format(str(target_task), str(aux_task)))
 
@@ -161,6 +186,8 @@ embeddings, mappings, data = loadDatasetPickle(pickleFile)
 if args.tune == 0:
     if args.nb_run == 1:
         model = BiLSTM(params)
+        if args.batch_range is not None:
+            model.setBatchRangeLength(args.batch_range)
         model.setMappings(mappings, embeddings)
         model.setDataset(datasets, data, mainModelName=args.target_task)  # KHUSUS MULTITSAK
 
@@ -174,6 +201,8 @@ if args.tune == 0:
 
         for current_run in range(1, args.nb_run + 1):
             model = BiLSTM(params)
+            if args.batch_range is not None:
+                model.setBatchRangeLength(args.batch_range)
             model.setMappings(mappings, embeddings)
             model.setDataset(datasets, data, mainModelName=args.target_task)  # KHUSUS MULTITSAK
 
@@ -190,6 +219,8 @@ else :
     for current_drop_out in drop_out_tuning :
         params['dropout'] = (current_drop_out, current_drop_out)
         model = BiLSTM(params)
+        if args.batch_range is not None:
+            model.setBatchRangeLength(args.batch_range)
         model.setMappings(mappings, embeddings)
         model.setDataset(datasets, data, mainModelName=args.target_task)  # KHUSUS MULTITSAK
 

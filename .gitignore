@@ -52,3 +52,7 @@ notebook/\.ipynb_checkpoints/
 results_backup/
 
 \.DS_Store
+
+result_analyze/
+
+results_analyze/

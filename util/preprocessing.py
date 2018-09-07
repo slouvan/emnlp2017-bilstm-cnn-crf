@@ -78,6 +78,7 @@ def prepare_training_data(datasets, filter_tags=None) :
                 np.random.seed(13)
                 shuffled_indices = np.random.choice(len(sentences), props['nb_sentence'])
                 sentences = np.asarray(sentences)[shuffled_indices].tolist()
+                #print(shuffled_indices)
                 dumpConll(os.path.join(data_folder, dataset_name, 'train.txt'), sentences, props['columns'])
 
             print("Total number of sentence in  {}  is {}".format(dataset_name, len(sentences)))
