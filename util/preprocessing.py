@@ -324,14 +324,21 @@ def getCasingVocab():
     return {entries[idx]:idx for idx in range(len(entries))}
 
 
-def createMatrices(sentences, mappings, padOneTokenSentence):
+def createMatrices(sentences, mappings, padOneTokenSentence, padMaxSentlength = False):
     data = []
     numTokens = 0
     numUnknownTokens = 0    
     missingTokens = FreqDist()
     paddedSentences = 0
 
+    maxSentLength = max([len(sentence['tokens']) for sentence in sentences])
+    for sentence in sentences:
+        for entry in sentence['tokens'] :
+            pass
+            #print("ENTRY : {}".format(entry))
+    print("Max sent length is : {}".format(maxSentLength))
 
+    #print("Sentence max length is : {}".format(maxSentLength))
     for sentence in sentences:
         row = {name: [] for name in list(mappings.keys())+['raw_tokens']}
         
@@ -339,7 +346,8 @@ def createMatrices(sentences, mappings, padOneTokenSentence):
             if mapping not in sentence:
                 continue
                     
-            for entry in sentence[mapping]:                
+            for entry in sentence[mapping]:
+                #print(" Entry : {}".format(entry))
                 if mapping.lower() == 'tokens':
                     numTokens += 1
                     idx = str2Idx['UNKNOWN_TOKEN']
@@ -367,23 +375,45 @@ def createMatrices(sentences, mappings, padOneTokenSentence):
                     idx = str2Idx[entry]
                                     
                 row[mapping].append(idx)
-                
+                #if mapping.lower() == 'characters' :
+                #    print("Mapping {} ".format(row['characters']))
+
         if len(row['tokens']) == 1 and padOneTokenSentence:
             paddedSentences += 1
             for mapping, str2Idx in mappings.items():
                 if mapping.lower() == 'tokens':
                     row['tokens'].append(mappings['tokens']['PADDING_TOKEN'])
-                    row['raw_tokens'].append('PADDING_TOKEN')
+                    #row['raw_tokens'].append('PADDING_TOKEN')
                 elif mapping.lower() == 'characters':
+                    #print("Masuk sini")
                     row['characters'].append([0])
                 else:
                     row[mapping].append(0)
-            
+
+
+        if padMaxSentlength and len(row['tokens']) < maxSentLength :
+            nb_iteration_for_padding = maxSentLength - len(row['tokens'])
+            print("Padding stuff")
+            for mapping, str2Idx in mappings.items():
+                if mapping.lower() == 'tokens':
+                    for i in range(0, nb_iteration_for_padding) :
+                        row['tokens'].append(mappings['tokens']['PADDING_TOKEN'])
+                        #row['raw_tokens'].append('PADDING_TOKEN')
+                elif mapping.lower() == 'characters':
+                    for i in range(0, nb_iteration_for_padding):
+                        row['characters'].append([0])
+                        #print("Masuk sini character")
+                else:
+                    #print("Masuk sini yang lain")
+                    for i in range(0, nb_iteration_for_padding):
+                        row[mapping].append(0)
+
         data.append(row)
 
     if numTokens > 0:
         logging.info("Unknown-Tokens: %.2f%%" % (numUnknownTokens/float(numTokens)*100))
-        
+    #print("DATA : {}".format(data))
+    #os._exit(2)
     return data
     
   
@@ -395,8 +425,6 @@ def createPklFiles(datasetFiles, mappings, cols, commentSymbol, valTransformatio
    
     extendMappings(mappings, trainSentences+devSentences+testSentences)
 
-                
-    
     charset = {"PADDING":0, "UNKNOWN":1}
     for c in " 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,-_()[]{}!?:;#'\"/\\%$`&=*+@^~|":
         charset[c] = len(charset)

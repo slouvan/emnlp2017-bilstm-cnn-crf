@@ -63,7 +63,7 @@ class BiLSTM:
     def setDataset(self, datasets, data, mainModelName=None):
         self.datasets = datasets
         self.data = data
-
+        #print("Set dataset : {}".format(self.data['ATIS_DEBUG']['trainMatrix']))
         # Create some helping variables
         self.mainModelName = mainModelName
         self.epoch = 0
@@ -89,8 +89,8 @@ class BiLSTM:
 
         for modelName in self.modelNames:
             labelKey = self.datasets[modelName]['label']
-            print("Label here : {}".format(self.datasets[modelName]['label']))
-            print("Keys : {}".format(self.mappings[labelKey]))
+            #print("Label here : {}".format(self.datasets[modelName]['label']))
+            #print("Keys : {}".format(self.mappings[labelKey]))
             self.labelKeys[modelName] = labelKey
             self.idx2Labels[modelName] = {v: k for k, v in self.mappings[labelKey].items()}
             
@@ -275,6 +275,7 @@ class BiLSTM:
 
 
     def trainModel(self):
+        #print("Beginning of trainModel  :  {}".format(self.data['ATIS_DEBUG']['trainMatrix']))
         self.epoch += 1
         
         if self.params['optimizer'] in self.learning_rate_updates and self.epoch in self.learning_rate_updates[self.params['optimizer']]:       
@@ -284,18 +285,89 @@ class BiLSTM:
 
 
         total_sentence = defaultdict(int)
+        #print("Before custom minibatch iterate :  {}".format(self.data['ATIS_DEBUG']['trainMatrix']))
+        '''
+        for batch in self.custom_minibatch_iterate_dataset():
+            print("CUSTOM BATCH : {}".format(batch))
+
+        for batch in self.minibatch_iterate_dataset() :
+            print("DEFAULT BATCH : {}".format(batch))
+        os._exit(2)
+        '''
+        '''
+        for batch in self.custom_minibatch_iterate_dataset() :
+            for idx, modelName in enumerate(self.modelNames):
+                if modelName in batch :
+                    nnLabels = batch[modelName][0]
+                    nnInput = batch[modelName][1:]
+                    #print("CUSTOM LOHAAA LEN NN INPUT {} {} {} {} {} {} <<".format(modelName, len(nnInput), type(nnInput), len(nnInput[0]), nnInput[0],  len(nnInput[1]), nnInput[1], len(nnInput[2]), nnInput[2]))
+                    total_sentence[modelName] += len(nnInput[0])
+                    self.models[modelName].train_on_batch(nnInput, nnLabels)
+        '''
+
+
+
         for batch in self.minibatch_iterate_dataset():
             self.global_step += 1
             for idx, modelName in enumerate(self.modelNames):
                 if modelName in batch :
                     nnLabels = batch[modelName][0]
                     nnInput = batch[modelName][1:]
-                    #print("{} {} {} {} {} {}".format(modelName, type(nnInput), len(nnInput[0]), nnInput[0],  len(nnInput[1]), nnInput[1]))
+                    #print("DEFAULT LOHAAA LEN NN INPUT {} {} {} {} {} {} <<".format(modelName, len(nnInput), type(nnInput), len(nnInput[0]), nnInput[0],  len(nnInput[1]), nnInput[1], len(nnInput[2]), nnInput[2]))
                     total_sentence[modelName] += len(nnInput[0])
                     self.models[modelName].train_on_batch(nnInput, nnLabels)
 
-
         print("Total training sentence : {}".format(total_sentence))
+
+    def custom_minibatch_iterate_dataset(self, modelNames = None):
+
+        for modelName in self.modelNames :
+            trainData = self.data[modelName]['trainMatrix']
+            #print("Inside custom_minibatch_iterate_dataset {}".format(trainData))
+            idxs = [ idx for idx in range(len(trainData))]
+            random.shuffle(idxs)
+
+            nbTotalMiniBatches = math.ceil(len(idxs) / self.params['miniBatchSize'])
+            print(" Total data point for {} is {}, total minibatch is {} with minibatchsize : {}".format(modelName, len(idxs), nbTotalMiniBatches, self.params['miniBatchSize']))
+
+            minibatch_ranges = []
+            start_range_idx = 0
+            for nb_minibatch in range(nbTotalMiniBatches):
+                if nb_minibatch + 1 < nbTotalMiniBatches:
+                    minibatch_ranges.append((start_range_idx, start_range_idx  + self.params['miniBatchSize']))
+                    start_range_idx += self.params['miniBatchSize']
+            minibatch_ranges.append((start_range_idx, start_range_idx + len(idxs) % self.params['miniBatchSize']))
+
+            #print("Ranges for the model {} is {}".format(modelName, minibatch_ranges))
+
+            batches = {}
+            for data_range in minibatch_ranges:
+                batches.clear()
+                trainMatrix = self.data[modelName]['trainMatrix']
+
+                '''
+                DEFAULT
+                trainMatrix = self.data[modelName]['trainMatrix']
+                dataRange = self.trainMiniBatchRanges[modelName][idx % len(self.trainMiniBatchRanges[modelName])]
+                labels = np.asarray([trainMatrix[idx][self.labelKeys[modelName]] for idx in range(dataRange[0], dataRange[1])])
+                labels = np.expand_dims(labels, -1)
+                print("DEFAULT, type of labels is {} with the shape of {}".format(type(labels), labels.shape))
+                batches[modelName] = [labels]
+                
+                '''
+                labels = np.asarray([ trainMatrix[idxs[minibatch_idx]][self.labelKeys[modelName]] for minibatch_idx in range(data_range[0], data_range[1])])
+                #print("CUSTOM, type {} LABELS : {}".format(type(labels), labels))
+
+                labels = np.expand_dims(labels, -1)
+                #print("CUSTOM, type of labels is {} with the shape of {}".format(type(labels), labels.shape))
+                batches[modelName] = [labels]
+
+                for featureName in self.params['featureNames']:
+                    inputData = np.asarray([trainMatrix[idxs[minibatch_idx]][featureName] for minibatch_idx in range(data_range[0], data_range[1])])
+                    #print("CUSTOM, type of inputData is {} with the shape of {}".format(type(inputData), inputData.shape))
+                    batches[modelName].append(inputData)
+                #print("CUSTOM BATCHES : {}".format(batches))
+                yield(batches)
 
 
     def minibatch_iterate_dataset(self, modelNames = None):
@@ -382,7 +454,7 @@ class BiLSTM:
             from copy import deepcopy
             maxRangeLength = max([len(self.trainMiniBatchRanges[modelName]) for modelName in modelNames])
             rangeLength = maxRangeLength
-            '''
+
             for modelName in modelNames :
                 # Check how many sentences in the range
                 total_sent = 0
@@ -399,7 +471,7 @@ class BiLSTM:
                 for i in range(modulo) :
                     #print("{} {}".format(i, len(temp)))
                     self.trainMiniBatchRanges[modelName].append(temp[i % len(temp)])
-            '''
+
 
         print("Final range Batches for the models ")
         for modelName in modelNames:
@@ -426,9 +498,11 @@ class BiLSTM:
                             cnt = 0
                             #print("dataRange : {}".format(dataRange))
                             labels = np.asarray([trainMatrix[idx][self.labelKeys[modelName]] for idx in range(dataRange[0], dataRange[1])])
+
                             labels = np.expand_dims(labels, -1)
 
                             batches[modelName] = [labels]
+
 
                             for featureName in self.params['featureNames']:
                                 inputData = np.asarray([trainMatrix[idx][featureName] for idx in range(dataRange[0], dataRange[1])])
@@ -439,15 +513,18 @@ class BiLSTM:
                     trainMatrix = self.data[modelName]['trainMatrix']
                     dataRange = self.trainMiniBatchRanges[modelName][idx % len(self.trainMiniBatchRanges[modelName])]
                     labels = np.asarray([trainMatrix[idx][self.labelKeys[modelName]] for idx in range(dataRange[0], dataRange[1])])
-                    labels = np.expand_dims(labels, -1)
+                    #print("DEFAULT, type {} LABELS : {}".format(type(labels), labels))
 
+                    labels = np.expand_dims(labels, -1)
+                    #print("DEFAULT, type of labels is {} with the shape of {}".format(type(labels), labels.shape))
                     batches[modelName] = [labels]
 
                     for featureName in self.params['featureNames']:
                         inputData = np.asarray([trainMatrix[idx][featureName] for idx in range(dataRange[0], dataRange[1])])
+                        #print("DEFAULT, type of inputData is {} with the shape of {}".format(type(inputData),inputData.shape))
                         batches[modelName].append(inputData)
                     counter[modelName] += 1
-
+            #print(" DEFAULT BATCHES : {}".format(batches))
             yield batches   
             
         print(counter)
@@ -463,12 +540,14 @@ class BiLSTM:
             self.resultsSavePath = None
         
     def fit(self, epochs):
+        #print("Inside FIT : {}".format(self.data['ATIS_DEBUG']['trainMatrix']))
         if self.models is None:
             self.buildModel()
+            #print("After Build Model : {}".format(self.data['ATIS_DEBUG']['trainMatrix']))
 
         total_train_time = 0
-        max_dev_score = {modelName:0 for modelName in self.models.keys()}
-        max_test_score = {modelName:0 for modelName in self.models.keys()}
+        max_dev_score = {modelName: -1 for modelName in self.models.keys()} # DANGER
+        max_test_score = {modelName: -1 for modelName in self.models.keys()}
         no_improvement_since = 0
         
         for epoch in range(epochs):      
@@ -583,8 +662,8 @@ class BiLSTM:
             raw_texts = [sentences[idx]['raw_tokens'] for idx in indices]
             #print("Len NN Input : {}".format(len(nnInput)))
             #print("NN input content : {}".format(nnInput))
-            #print("Len Raw Text : {}".format(len(raw_texts)))
-            #print(raw_texts)
+            #print("Len Raw Text : {} Raw Text : {}".format(len(raw_texts), raw_texts))
+
 
             predictions = model.predict(nnInput, verbose=False)
             predictions = predictions.argmax(axis=-1) #Predict classes            
@@ -592,8 +671,8 @@ class BiLSTM:
             #print("Idx 2 Labels {} {}".format(type(self.idx2Labels), self.idx2Labels))
             predIdx = 0
             for idx in indices:
-                predLabels[idx] = predictions[predIdx]
-
+                predLabels[idx] = predictions[predIdx][:len(sentences[idx]['raw_tokens'])]
+                #print("Pred Labels idx {}".format(predLabels[idx]))
                 #print("Prediction type : {}".format(type(predLabels[idx])))
                 #print("Prediction : {}".format(predLabels[idx]))
                 predIdx += 1
@@ -631,11 +710,16 @@ class BiLSTM:
         
     def computeF1(self, modelName, sentences, mode="", epoch = 0):
         labelKey = self.labelKeys[modelName]
+        print("Label key : {}".format(labelKey))
         model = self.models[modelName]
         idx2Label = self.idx2Labels[modelName]
         
-        correctLabels = [sentences[idx][labelKey] for idx in range(len(sentences))]
+        correctLabels = [sentences[idx][labelKey][:len(sentences[idx]['raw_tokens'])] for idx in range(len(sentences))]
+        #print("Correct labels : {}".format(correctLabels))
+        #os._exit(2)
         predLabels = self.predictLabels(model, sentences)
+        #print("Prediction labels : {}".format(predLabels))
+
 
         if mode == "dev" :
             self.current_dev_prediction = predLabels
