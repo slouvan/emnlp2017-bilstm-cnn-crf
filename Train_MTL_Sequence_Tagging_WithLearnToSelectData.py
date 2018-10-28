@@ -13,7 +13,7 @@ import argparse
 import pickle
 from util.preprocessing import perpareDataset, loadDatasetPickle, readCoNLL, remove_pkl_files,prepare_training_data, read_dict, get_target_task, build_vocab_from_domains, build_all_domain_term_dist, get_most_similar_domain, read_dict_data, set_target_task, compute_label_embeddings, get_nearest_labels
 from keras import backend as K
-from util.constants import  DATA_DIR, TASKS, NERS, NER_TAGS
+from util.constants import  DATA_DIR, TASKS, NERS
 
 
 parser = argparse.ArgumentParser(description="Experiment Slot Filling")
@@ -31,7 +31,7 @@ parser.add_argument("-p", "--param", dest="param_conf", help="Hyperparameters of
 parser.add_argument("-e", "--epoch", dest="nb_epoch", help="Number of epoch", default=50, type=int)
 parser.add_argument("-t", "--tune", dest="tune", default=0, type=int)
 parser.add_argument("-br", "--batch-range", dest="batch_range", default=None, type=str)
-parser.add_argument("--filter-tags", dest="filter_tags", default=None, nargs="+", choices=NER_TAGS)
+
 '''
 parser.add_argument("-i", "--input", dest="input_dataset_conf", help="Input dataset configuration", required = True, type=str)
 '''
@@ -146,16 +146,8 @@ set_target_task(datasets, args.target_task)
 if args.nb_sentence is not None :
     datasets[args.target_task]['nb_sentence'] = args.nb_sentence
 
-relevant_label_embeddings = None
-if args.label_embedding is not None:
-    matrix = pickle.load(open(args.label_embedding+".emb", "rb"))
-    idxs = pickle.load(open(args.label_embedding+".idxs", "rb"))
-    relevant_label_embeddings = get_nearest_labels(args.target_task, aux_task, matrix, idxs)
-    print(relevant_label_embeddings)
 
-#remove_pkl_files()
-#prepare_training_data(datasets, filter_tags=relevant_label_embeddings)
-prepare_training_data(datasets, args)
+prepare_training_data(datasets)
 
 embeddingsPath = 'komninos_english_embeddings.gz' #Word embeddings by Levy et al: https://levyomer.wordpress.com/2014/04/25/dependency-based-word-embeddings/
 

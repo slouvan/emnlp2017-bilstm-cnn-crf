@@ -2,10 +2,11 @@ import os
 
 
 dirname = "/Users/slouvan/sandbox/emnlp2017-bilstm-cnn-crf/result_analyze/"
-base_exp_dir = "MTL_MIT_Movie_CONLL_NB_SENT_"
+base_exp_dir_1 = "MTL_MIT_Restaurant_NB_SENT_"
+base_exp_dir_2 = "_CONLL_NB_SENT_SAME"
 
-for i in range(10,110, 10):
-    path = os.path.join(dirname, base_exp_dir+str(i))
+for i in [10, 20, 40, 80, 100, 200, 400, 800]:
+    path = os.path.join(dirname, base_exp_dir_1+str(i)+base_exp_dir_2)
     #print("Path = {}".format(path))
     with open(os.path.join(path, "performance.out"), "r") as f:
         lines = f.readlines()

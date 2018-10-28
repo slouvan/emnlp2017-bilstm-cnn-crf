@@ -57,24 +57,49 @@ def retag_sentences(sentences, relevant_tags, column, task):
     return filtered_sentence
 
 
-def prepare_training_data(datasets, filter_tags=None) :
+def filter_sent_by_tag(sentences, tags):
+    counter = 0
+    filtered_sentence = []
+    for sentence in sentences:
+        keys = sentence.keys()
+        label_key = ""
+        for key in keys:
+            if "_BIO" in key:
+                label_key = key
+                break
+        annotations = sentence[label_key]
+        unique_tags = set()
+        for annotation in annotations:
+            if annotation.startswith("B-"):
+                field = annotation.split("B-")
+                unique_tags.add(field[1])
+
+        if tags == unique_tags or unique_tags.issubset(tags) and len(unique_tags) > 0:
+                filtered_sentence.append(sentence)
+    print("Before filtering : {} \n After filtering : {}".format(len(sentences), len(filtered_sentence)))
+    return filtered_sentence
+
+def prepare_training_data(datasets, args=None) :
     data_folder = 'data'
     for dataset_name, props in datasets.items():
             sentences = None
             from numpy.random import shuffle
             if props['ori'] and os.path.isfile(os.path.join(data_folder,dataset_name,'train.txt.ori')) and props['nb_sentence'] is None:
                 sentences = readCoNLL(os.path.join(data_folder, dataset_name, 'train.txt.ori'), props['columns'])
-                if filter_tags is not None and dataset_name != get_target_task(datasets):
-                    print("Retagging {}".format(dataset_name))
-                    sentences = retag_sentences(sentences, filter_tags, props['columns'][1], dataset_name)
+                if args.filter_tags is not None and dataset_name != get_target_task(datasets):
+                    print("FILTERING {}".format(dataset_name))
+                    sentences = filter_sent_by_tag(sentences, set(args.filter_tags))
+                    #sentences = retag_sentences(sentences, filter_tags, props['columns'][1], dataset_name)
                     dumpConll(os.path.join(data_folder, dataset_name, 'train.txt'), sentences, props['columns'])
                 else :
                     copyfile(os.path.join(data_folder, dataset_name, 'train.txt.ori'), os.path.join(data_folder, dataset_name, 'train.txt'))
             else:
                 sentences = readCoNLL(os.path.join(data_folder, dataset_name, 'train.txt.ori'), props['columns'])
-                if filter_tags is not None and dataset_name != get_target_task(datasets):
-                    print("Retagging")
-                    sentences = retag_sentences(sentences, filter_tags, props['columns'][1], dataset_name)
+                print("FILTERING {}".format(dataset_name))
+                if args.filter_tags is not None and dataset_name != get_target_task(datasets):
+                    #print("Retagging")
+                    sentences = filter_sent_by_tag(sentences, set(args.filter_tags))
+                    #sentences = retag_sentences(sentences, filter_tags, props['columns'][1], dataset_name)
                 np.random.seed(13)
                 shuffled_indices = np.random.choice(len(sentences), props['nb_sentence'])
                 sentences = np.asarray(sentences)[shuffled_indices].tolist()

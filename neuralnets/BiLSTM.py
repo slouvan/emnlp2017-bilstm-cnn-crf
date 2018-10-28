@@ -311,6 +311,7 @@ class BiLSTM:
             self.global_step += 1
             for idx, modelName in enumerate(self.modelNames):
                 if modelName in batch :
+                    #print("Training : {}".format(modelName))
                     nnLabels = batch[modelName][0]
                     nnInput = batch[modelName][1:]
                     #print("DEFAULT LOHAAA LEN NN INPUT {} {} {} {} {} {} <<".format(modelName, len(nnInput), type(nnInput), len(nnInput[0]), nnInput[0],  len(nnInput[1]), nnInput[1], len(nnInput[2]), nnInput[2]))
@@ -513,16 +514,26 @@ class BiLSTM:
                     trainMatrix = self.data[modelName]['trainMatrix']
                     dataRange = self.trainMiniBatchRanges[modelName][idx % len(self.trainMiniBatchRanges[modelName])]
                     labels = np.asarray([trainMatrix[idx][self.labelKeys[modelName]] for idx in range(dataRange[0], dataRange[1])])
+                    if modelName != self.mainModelName and self.batchRangeLength == "same":
+                        labels = labels[:len(batches[self.mainModelName][0])]
+                        #print("Len of main model is {}".format(len(batches[self.mainModelName][0])))
                     #print("DEFAULT, type {} LABELS : {}".format(type(labels), labels))
 
                     labels = np.expand_dims(labels, -1)
                     #print("DEFAULT, type of labels is {} with the shape of {}".format(type(labels), labels.shape))
                     batches[modelName] = [labels]
 
+                    cnt_feature = 0
                     for featureName in self.params['featureNames']:
                         inputData = np.asarray([trainMatrix[idx][featureName] for idx in range(dataRange[0], dataRange[1])])
+                        if modelName != self.mainModelName and self.batchRangeLength == "same":
+                            # labels = labels[:len(batches[self.mainModelName][0])]
+                            inputData = inputData[:len(batches[self.mainModelName][cnt_feature])]
+                            #print("Len of main model input data is {}  featureName : {}".format(len(batches['ATIS'][1]), featureName))
+                            #print("Len of main model input data is {} featureName : {}".format(len(batches['ATIS'][2]), featureName))
                         #print("DEFAULT, type of inputData is {} with the shape of {}".format(type(inputData),inputData.shape))
                         batches[modelName].append(inputData)
+                        cnt_feature += 1
                     counter[modelName] += 1
             #print(" DEFAULT BATCHES : {}".format(batches))
             yield batches   
