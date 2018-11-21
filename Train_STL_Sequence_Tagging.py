@@ -20,6 +20,8 @@ parser.add_argument("-p", "--param", dest="param_conf", help="Hyperparameters of
 parser.add_argument("-e", "--epoch", dest="nb_epoch", help="Number of epoch", default=50, type=int)
 parser.add_argument("-do","--dropout", dest="dropout_rate", help="Dropout", default=0.25, type=float)
 parser.add_argument("-t", "--tune", dest="tune", default=0, type=int)
+parser.add_argument("--filter-tags", dest="filter_tags", default=None, nargs="+")
+
 args = parser.parse_args()
 
 # :: Change into the working dir of the script ::
@@ -58,7 +60,7 @@ print("{} {}".format(type(datasets), datasets))
 if args.nb_sentence is not None :
     datasets[list(datasets.keys())[0]]['nb_sentence'] = args.nb_sentence
 
-prepare_training_data(datasets)
+prepare_training_data(datasets, args)
 
 # :: Path on your computer to the word embeddings. Embeddings by Komninos et al. will be downloaded automatically ::
 embeddingsPath = 'komninos_english_embeddings.gz'

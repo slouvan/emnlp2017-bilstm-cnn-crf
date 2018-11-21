@@ -9,38 +9,42 @@ from util.preprocessing import addCharInformation, createMatrices, addCasingInfo
 from neuralnets.BiLSTM import BiLSTM
 import sys
 
-if len(sys.argv) < 3:
-    print("Usage: python RunModel.py modelPath inputPath")
+if len(sys.argv) < 2:
+    print("Usage: python RunModel.py modelPath")
     exit()
 
 modelPath = sys.argv[1]
-inputPath = sys.argv[2]
+#inputPath = sys.argv[2]
 
 # :: Read input ::
-with open(inputPath, 'r') as f:
-    text = f.read()
+#with open(inputPath, 'r') as f:
+#    text = f.read()
 
 # :: Load the model ::
+print("Loading the model...")
 lstmModel = BiLSTM.loadModel(modelPath)
 
 
 # :: Prepare the input ::
-sentences = [{'tokens': nltk.word_tokenize(sent)} for sent in nltk.sent_tokenize(text)]
-addCharInformation(sentences)
-addCasingInformation(sentences)
-dataMatrix = createMatrices(sentences, lstmModel.mappings, True)
+while True:
+    sent = input("Enter the sentence : ")
+    sentences = [{'tokens': nltk.word_tokenize(sent)}]
+    #sentences = [{'tokens': nltk.word_tokenize(sent)} for sent in nltk.sent_tokenize(text)]
+    addCharInformation(sentences)
+    addCasingInformation(sentences)
+    dataMatrix = createMatrices(sentences, lstmModel.mappings, True)
 
-# :: Tag the input ::
-tags = lstmModel.tagSentences(dataMatrix)
+    # :: Tag the input ::
+    tags = lstmModel.tagSentences(dataMatrix)
 
-# :: Output to stdout ::
-for sentenceIdx in range(len(sentences)):
-    tokens = sentences[sentenceIdx]['tokens']
+    # :: Output to stdout ::
+    for sentenceIdx in range(len(sentences)):
+        tokens = sentences[sentenceIdx]['tokens']
 
-    for tokenIdx in range(len(tokens)):
-        tokenTags = []
-        for modelName in sorted(tags.keys()):
-            tokenTags.append(tags[modelName][sentenceIdx][tokenIdx])
+        for tokenIdx in range(len(tokens)):
+            tokenTags = []
+            for modelName in sorted(tags.keys()):
+                tokenTags.append(tags[modelName][sentenceIdx][tokenIdx])
 
-        print("%s\t%s" % (tokens[tokenIdx], "\t".join(tokenTags)))
-    print("")
+            print("%s\t%s" % (tokens[tokenIdx], "\t".join(tokenTags)))
+        print("")
